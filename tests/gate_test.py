@@ -4,7 +4,7 @@ import unittest
 import threading
 from pathlib import Path
 sys.path.insert(0, str(Path('agent').resolve()))
-from agent import ConsentGate
+from monitoring_lifecycle import ConsentGate, may_renew_lease
 
 class GateTests(unittest.TestCase):
     def test_consent_session_and_lease_all_required(self):
@@ -23,6 +23,15 @@ class GateTests(unittest.TestCase):
         gate.stop()
         self.assertFalse(gate.allowed())
         self.assertIsNone(gate.accepted)
+
+    def test_lease_renewal_rejects_expiry_and_preserves_a_newer_grant(self):
+        self.assertFalse(may_renew_lease(9,10,8,True))
+        self.assertFalse(may_renew_lease(12,10,8,True,received_at=13))
+        self.assertTrue(may_renew_lease(16,10,11,False,received_at=12))
+        self.assertFalse(may_renew_lease(16,10,8,False))
+        self.assertTrue(may_renew_lease(16,10,11,False))
+        self.assertTrue(may_renew_lease(16,10,8,True))
+        self.assertTrue(may_renew_lease(16,10,8,None))
 
     def test_stop_signal_preempts_an_in_progress_capture_lock(self):
         gate=ConsentGate()

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
+import AttemptControls from "./AttemptControls.jsx";
 import PdfViewer from "./PdfViewer.jsx";
-export function ExamProgress({ token, sessionId }) {
+export function ExamProgress({ token, sessionId, onReview }) {
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
-    [now, setNow] = useState(Date.now());
+    [now, setNow] = useState(Date.now()),
+    [revision, setRevision] = useState(0),
+    [flaggedOnly, setFlaggedOnly] = useState(false);
   useEffect(() => {
     if (!sessionId) return;
     let alive = true;
@@ -30,7 +33,7 @@ export function ExamProgress({ token, sessionId }) {
       clearInterval(poll);
       clearInterval(clock);
     };
-  }, [token, sessionId]);
+  }, [token, sessionId, revision]);
   return (
     <section className="panel" id="exam-progress">
       <h2>Student examination progress</h2>
@@ -44,6 +47,14 @@ export function ExamProgress({ token, sessionId }) {
             {data.assignment.total_marks} marks · Closes{" "}
             {new Date(data.assignment.closes_at).toLocaleString()}
           </p>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={flaggedOnly}
+              onChange={(e) => setFlaggedOnly(e.target.checked)}
+            />{" "}
+            Only students with pending incidents or app alerts
+          </label>
           <div className="table-scroll">
             <table>
               <thead>
@@ -52,59 +63,109 @@ export function ExamProgress({ token, sessionId }) {
                   <th>Examination status</th>
                   <th>Remaining time</th>
                   <th>Submission</th>
+                  <th>Review and manual controls</th>
                 </tr>
               </thead>
               <tbody>
-                {data.students.map((s) => (
-                  <tr key={s.device_id}>
-                    <td>{s.name}</td>
-                    <td>
-                      <span className="badge">
-                        {
-                          {
-                            not_opened: "Not opened",
-                            opened: "Paper opened",
-                            started: "Taking examination",
-                            submitted: "Submitted",
-                            cancelled: "Ended before start",
-                          }[s.status]
-                        }
-                      </span>
-                      {s.started_at && (
-                        <small>
-                          Started {new Date(s.started_at).toLocaleTimeString()}
-                        </small>
-                      )}
-                    </td>
-                    <td>
-                      {s.status === "started"
-                        ? Math.max(
-                            0,
-                            s.remainingSeconds -
-                              Math.floor((now - data.clientReceivedAt) / 1000),
-                          ) + " seconds"
-                        : "—"}
-                    </td>
-                    <td>
-                      {s.submitted_at
-                        ? new Date(s.submitted_at).toLocaleString() +
-                          " · " +
-                          s.submission_reason
-                        : "Not submitted"}
-                      {s.status === "submitted" && (
-                        <details>
-                          <summary>View response</summary>
-                          <pre className="answer-review">
-                            {s.answers || "No text response provided."}
-                          </pre>
-                        </details>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {data.students
+                  .filter(
+                    (s) =>
+                      !flaggedOnly ||
+                      s.pending_incidents + s.pending_app_alerts > 0,
+                  )
+                  .map((s) => (
+                    <tr key={s.device_id}>
+                      <td>{s.name}</td>
+                      <td>
+                        <span className="badge">
+                          {s.paused_at && s.status === "started"
+                            ? "Paused by invigilator"
+                            : {
+                                not_opened: "Not opened",
+                                opened: "Paper opened",
+                                started: "Taking examination",
+                                submitted: "Submitted",
+                                cancelled: "Ended before start",
+                              }[s.status]}
+                        </span>
+                        {s.started_at && (
+                          <small>
+                            Started{" "}
+                            {new Date(s.started_at).toLocaleTimeString()}
+                          </small>
+                        )}
+                      </td>
+                      <td>
+                        {s.status === "started"
+                          ? Math.max(
+                              0,
+                              s.remainingSeconds -
+                                Math.floor(
+                                  (now - data.clientReceivedAt) / 1000,
+                                ),
+                            ) + " seconds"
+                          : "—"}
+                      </td>
+                      <td>
+                        {s.submitted_at
+                          ? new Date(s.submitted_at).toLocaleString() +
+                            " · " +
+                            s.submission_reason
+                          : "Not submitted"}
+                        {s.status === "submitted" && (
+                          <details>
+                            <summary>View response</summary>
+                            <pre className="answer-review">
+                              {s.answers || "No text response provided."}
+                            </pre>
+                          </details>
+                        )}
+                      </td>
+                      <td>
+                        <p>
+                          {s.pending_incidents} pending incidents;{" "}
+                          {s.pending_app_alerts} application alerts
+                        </p>
+                        <button
+                          className="secondary"
+                          onClick={() => onReview?.(s.device_id, sessionId)}
+                        >
+                          Review student incidents and evidence
+                        </button>
+                        {s.control_reason && (
+                          <p>Latest control reason: {s.control_reason}</p>
+                        )}
+                        <AttemptControls
+                          key={sessionId + ":" + s.attempt_id}
+                          token={token}
+                          sessionId={sessionId}
+                          attempt={s}
+                          onChanged={() => setRevision((v) => v + 1)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
+          {flaggedOnly &&
+            !data.students.some(
+              (s) => s.pending_incidents + s.pending_app_alerts > 0,
+            ) && (
+              <p>
+                No students have pending incidents or application alerts in this
+                session.
+              </p>
+            )}
+          <details>
+            <summary>Manual control audit history</summary>
+            {(data.controls || []).map((c) => (
+              <p key={c.id}>
+                {new Date(c.created_at).toLocaleString()} - {c.actor_email} -{" "}
+                {c.action} - {c.reason} - receipt {c.id}
+              </p>
+            ))}
+          </details>
           {!data.students.length && (
             <p>No enrolled devices match this assignment yet.</p>
           )}

@@ -208,16 +208,29 @@ export function installEvidence({
         offset = Number(req.query.offset ?? 0);
       if (!Number.isInteger(offset) || offset < 0)
         throw issue(400, "Invalid history page");
+      const filters = [req.teacher];
+      let scope = "e.teacher_id=$1";
+      for (const [key, column] of [
+        ["studentId", "device_id"],
+        ["sessionId", "session_id"],
+      ]) {
+        if (req.query[key]) {
+          if (!uuid(req.query[key]))
+            throw issue(400, "Invalid incident filter");
+          filters.push(req.query[key]);
+          scope += ` AND e.${column}=$${filters.length}`;
+        }
+      }
       const events = (
         await db.query(
-          "SELECT e.id,e.session_id,e.device_id,e.attempt_id,d.name AS device_name,s.name AS session_name,e.category,e.detail,e.observed_at,e.received_at,(e.evidence IS NOT NULL AND e.evidence_expires_at>now()) AS has_evidence,(e.clip IS NOT NULL AND e.evidence_expires_at>now()) AS has_clip,e.clip_status,e.clip_metadata,e.review_status,e.review_note,e.reviewed_at,e.evidence_expires_at FROM proctor_events e JOIN devices d ON d.id=e.device_id JOIN sessions s ON s.id=e.session_id WHERE e.teacher_id=$1 ORDER BY e.received_at DESC,e.id LIMIT $2 OFFSET $3",
-          [req.teacher, limit, offset],
+          `SELECT e.id,e.session_id,e.device_id,e.attempt_id,d.name AS device_name,s.name AS session_name,e.category,e.detail,e.observed_at,e.received_at,(e.evidence IS NOT NULL AND e.evidence_expires_at>now()) AS has_evidence,(e.clip IS NOT NULL AND e.evidence_expires_at>now()) AS has_clip,e.clip_status,e.clip_metadata,e.review_status,e.review_note,e.reviewed_at,e.evidence_expires_at FROM proctor_events e JOIN devices d ON d.id=e.device_id JOIN sessions s ON s.id=e.session_id WHERE ${scope} ORDER BY e.received_at DESC,e.id LIMIT $${filters.length + 1} OFFSET $${filters.length + 2}`,
+          [...filters, limit, offset],
         )
       ).rows;
       const total = (
         await db.query(
-          "SELECT count(*)::integer AS n FROM proctor_events WHERE teacher_id=$1",
-          [req.teacher],
+          "SELECT count(*)::integer AS n FROM proctor_events e WHERE " + scope,
+          filters,
         )
       ).rows[0].n;
       res.json({
@@ -283,6 +296,21 @@ export function installEvidence({
         );
       const attempt = await activeAttempt(d, o.cameraConsent);
       if (!attempt) throw issue(409, "Student examination is not in progress");
+      const incidentId = req.body.incidentId ?? null;
+      if (
+        incidentId !== null &&
+        (!uuid(incidentId) ||
+          !(
+            await db.query(
+              "SELECT 1 FROM proctor_events WHERE id=$1 AND teacher_id=$2 AND device_id=$3 AND session_id=$4 AND attempt_id=$5",
+              [incidentId, req.teacher, d.id, o.cameraConsent, attempt.id],
+            )
+          ).rows.length)
+      )
+        throw issue(
+          404,
+          "Incident does not belong to this active student attempt",
+        );
       if (Date.now() - (o.lastTeacherCheck || 0) < 5000)
         throw issue(
           429,
@@ -302,15 +330,15 @@ export function installEvidence({
       const id = randomUUID();
       o.lastTeacherCheck = Date.now();
       await db.query(
-        "INSERT INTO camera_check_requests(id,teacher_id,device_id,session_id) VALUES ($1,$2,$3,$4)",
-        [id, req.teacher, d.id, o.cameraConsent],
+        "INSERT INTO camera_check_requests(id,teacher_id,device_id,session_id,source_event_id) VALUES ($1,$2,$3,$4,$5)",
+        [id, req.teacher, d.id, o.cameraConsent, incidentId],
       );
       await event(
         req.teacher,
         o.cameraConsent,
         d.id,
         "camera_check_requested",
-        { requestId: id },
+        { requestId: id, observationId: incidentId },
       );
       try {
         const ack = await o.socket

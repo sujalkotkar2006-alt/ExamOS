@@ -638,3 +638,21 @@ body { background: #f3f6fb; color: #172943; }
 @media(max-width:760px) { .vision-topbar { flex-direction: row; }.vision-topbar nav { width: 100%; flex-basis: 100%; }.teacher-profile span { max-width: 75px; }.teacher-profile { gap: 8px; } }
 @media(max-width:760px) { .vision-topbar nav { flex-wrap: wrap; row-gap: 2px; }.vision-topbar nav a { padding: 8px 10px; } }
 .vision-app .evidence-dialog > img, .vision-app .evidence-dialog > video { width: min(100%,900px); object-fit: contain; }
+
+.screen-filters { display:flex;flex-wrap:wrap;gap:16px;margin:18px 0; }
+.screen-filters label { display:grid;gap:6px;flex:1;min-width:160px; }
+.screen-filters input,.screen-filters select { width:100%;min-width:0; }
+.screen-age { padding:0 14px;color:#5b708c;font-size:12px; }
+.screen-dialog { border:1px solid #dbe4ef;border-radius:12px;padding:24px;width:min(1100px,94vw);max-height:94vh;overflow:auto;color:#172943; }
+.screen-dialog::backdrop { background:rgba(10,24,44,.75); }
+.focused-primary-screen { background:#101c2e;display:flex;align-items:center;justify-content:center;min-height:200px;color:#e3eaf2; }
+.focused-primary-screen img { display:block;max-width:100%;max-height:60vh;object-fit:contain; }
+.screen-empty { text-align:center;padding:24px; }
+.screen-navigation { display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:16px; }
+.screen-navigation span { font-size:12px;color:#61728a; }
+@media(max-width:600px) { .screen-dialog { padding:14px; }.screen-navigation { flex-wrap:wrap; }.screen-navigation span { order:3; }.screen-dialog .section-head { flex-wrap:wrap; } }
+
+.focused-primary-screen .screen-empty p { color:#c4d1e1; }
+.screen-dialog h2,.devices .device-head strong { overflow-wrap:anywhere; }
+.devices .device footer { gap:8px;flex-wrap:wrap; }
+.devices .device footer span { min-width:0;overflow-wrap:anywhere;flex:1 1 140px; }

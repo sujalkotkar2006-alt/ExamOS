@@ -19,6 +19,7 @@ import requests
 import socketio
 import psutil
 from PIL import Image, ImageTk
+from monitoring_lifecycle import ConsentGate, may_renew_lease
 from camera_monitor import CameraMonitor
 from evidence_uploads import EvidenceUploads
 from exam_environment import ExamEnvironment
@@ -45,24 +46,6 @@ def server_origin(value):
     return parsed.scheme + '://' + parsed.netloc.lower()
 
 
-class ConsentGate:
-    def __init__(self):
-        self.session = None
-        self.accepted = None
-        self.lease_until = 0
-        self.lock = threading.RLock()
-        self.stop_requested = threading.Event()
-
-    def stop(self):
-        # Interrupt eligibility immediately, even if a native grab is finishing.
-        self.stop_requested.set()
-        with self.lock:
-            self.accepted = None
-            self.lease_until = 0
-
-    def allowed(self):
-        with self.lock:
-            return bool(not self.stop_requested.is_set() and self.session and self.accepted == self.session['id'] and time.monotonic() < self.lease_until)
 
 
 class Agent:
@@ -79,6 +62,7 @@ class Agent:
         self.quit = threading.Event()
         self.network_lock = threading.RLock()
         self.consent_generation = 0
+        self.screen_granted_at = 0
         self.consent_pending = False
         self.stopping = False
         self.closing = False
@@ -229,9 +213,11 @@ class Agent:
                 self.client = client
                 @client.on('session')
                 def session(data):
-                    self.update_session(data)
+                    if self.client is client and client.connected:
+                        self.update_session(data)
                 @client.on('exam-finished')
                 def exam_finished(data):
+                    if self.client is not client: return
                     self.exam_state = {'status': 'submitted'}
                     self.gate.stop()
                     self.camera.stop()
@@ -239,12 +225,14 @@ class Agent:
                     self.ui.put(('stop_monitoring', 'exam_finished'))
                 @client.on('stop-monitoring')
                 def monitoring_stopped(data):
+                    if self.client is not client: return
                     self.gate.stop()
                     self.camera.stop()
                     self.environment.close()
                     self.ui.put(('stop_monitoring', 'student_stop'))
                 @client.on('camera-check-request')
                 def camera_check_requested(data):
+                    if self.client is not client: return {'ok':False,'error':'Replaced connection'}
                     if data.get('sessionId')!=self.camera.session_id or not self.camera.request_check(data.get('requestId')):
                         return {'ok':False,'error':'Camera or snapshot consent is not active, or another check is pending'}
                     return {'ok':True,'requestId':data.get('requestId')}
@@ -294,11 +282,13 @@ class Agent:
         generation = self.consent_generation
         def work():
             try:
+                requested_at=time.monotonic()
                 result = self.server_call(client, 'consent', {'sessionId': session['id'], 'accept': True}, timeout=4)
                 with self.gate.lock:
-                    if generation == self.consent_generation and result.get('ok') and self.gate.session and self.gate.session['id'] == session['id'] and client.connected:
+                    if self.client is client and time.monotonic()<requested_at+6 and generation == self.consent_generation and result.get('ok') and self.gate.session and self.gate.session['id'] == session['id'] and client.connected:
+                        self.screen_granted_at=time.monotonic()
                         self.gate.accepted = session['id']
-                        self.gate.lease_until = min(time.monotonic() + 6, self.attempt_until or float('inf'))
+                        self.gate.lease_until = min(requested_at + 6, self.attempt_until or float('inf'))
                         self.gate.stop_requested.clear()
             except Exception as exc:
                 if generation == self.consent_generation:
@@ -418,16 +408,25 @@ class Agent:
     def monitor(self, client):
         try:
             with MSS() as capture:
-                while client.connected and not self.quit.is_set():
+                while self.client is client and client.connected and not self.quit.is_set():
                     try:
+                        requested_at=time.monotonic()
                         reply = self.server_call(client, 'heartbeat', {}, timeout=3)
+                        if self.client is not client or not client.connected:
+                            break
                         self.update_session(reply.get('session'))
                         self.exam_state = reply.get('exam')
                         self.attempt_until = None
                         if self.exam_state and self.exam_state.get('status') == 'started' and self.exam_state.get('deadline_at') and reply.get('serverNow'):
                             seconds = (datetime.fromisoformat(self.exam_state['deadline_at'].replace('Z','+00:00')) - datetime.fromisoformat(reply['serverNow'].replace('Z','+00:00'))).total_seconds()
-                            self.attempt_until = time.monotonic() + max(0, seconds)
-                        self.camera.lease_until = time.monotonic() + 6
+                            self.attempt_until = requested_at + max(0, seconds)
+                        if self.camera.running() and not may_renew_lease(self.camera.lease_until,requested_at,getattr(self.camera,'grant_accepted_at',0),reply.get('cameraConsented') if self.camera.status=='active' else None,received_at=time.monotonic()):
+                            self.camera.stop()
+                        else:
+                            self.camera.lease_until = requested_at + 6
+                        if self.gate.accepted and not may_renew_lease(self.gate.lease_until,requested_at,self.screen_granted_at,reply.get('screenConsented'),received_at=time.monotonic()):
+                            self.gate.stop()
+                            self.ui.put(('stop_monitoring','lease_expired'))
                         self.ui.put(('camera_policy', reply.get('proctoring', {})))
                         if self.exam_state and self.exam_state.get('status') in ('submitted', 'cancelled'):
                             self.gate.stop()
@@ -439,7 +438,7 @@ class Agent:
                                 self.ui.put(('stop_monitoring', 'lease_expired'))
                                 self.gate.stop()
                             elif self.gate.accepted:
-                                self.gate.lease_until = min(time.monotonic() + 6, self.attempt_until or float('inf'))
+                                self.gate.lease_until = min(requested_at + 6, self.attempt_until or float('inf'))
                         if self.gate.allowed() and self.indicator_ready:
                             with self.gate.lock:
                                 if not self.gate.allowed():
@@ -476,15 +475,18 @@ class Agent:
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         pass
                     except Exception as exc:
+                        if self.client is not client: break
                         self.gate.stop()
                         self.camera.stop()
-                        self.ui.put(('error', 'Sharing stopped: ' + str(exc)))
+                        self.ui.put(('monitoring_error', 'Sharing stopped: ' + str(exc)))
+                        capture.close()  # Release native screen handles before a slow transport shutdown.
                         client.disconnect()
                         break
                     self.quit.wait(2)
         except Exception as exc:
+            if self.client is not client: return
             self.gate.stop()
-            self.ui.put(('error', 'Capture unavailable: ' + str(exc)))
+            self.ui.put(('monitoring_error', 'Capture unavailable: ' + str(exc)))
             client.disconnect()
 
     def poll(self):
@@ -496,6 +498,11 @@ class Agent:
                     self.render_monitoring_controls()
                     messagebox.showerror('ExamOS', data)
                     self.connect_button.config(state='normal')
+                elif kind=='monitoring_error':
+                    self.last_error=data
+                    self.connection_status.config(text=data+' — reconnect and consent again',fg='#a92e27')
+                    self.connect_button.config(state='normal',text='Reconnect')
+                    self.render_monitoring_controls()
                 elif kind == 'disconnected':
                     self.environment.close()
                     self.connect_button.config(state='normal', text='Reconnect' if self.config else 'Enroll / Connect')

@@ -1,5 +1,5 @@
 import { chromium } from "@playwright/test";
-import { PGlite } from "@electric-sql/pglite";
+import {testDatabase} from "./test-database.mjs";
 import http from "node:http";
 import { randomUUID, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { migrate } from "../server/db.js";
 import { createApp } from "../server/app.js";
 import { mkdir } from "node:fs/promises";
-const db = new PGlite();
+const db = await testDatabase();
 await migrate(db);
 const password = randomBytes(20).toString("hex");
 await db.query("INSERT INTO teachers VALUES ($1,$2,$3)", [
@@ -15,7 +15,7 @@ await db.query("INSERT INTO teachers VALUES ($1,$2,$3)", [
   "browser@examos.local",
   await bcrypt.hash(password, 4),
 ]);
-const { app, attach } = createApp(db, randomBytes(48).toString("hex"));
+const { app, attach, drain } = createApp(db, randomBytes(48).toString("hex"));
 const server = http.createServer(app),
   live = attach(server);
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -74,5 +74,6 @@ try {
   await browser.close();
   await new Promise((r) => live.close(r));
   server.close();
+  await drain();
   await db.close();
 }

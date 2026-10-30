@@ -16,6 +16,10 @@ Start with the problem statement, current status, and roadmap. Future coding ses
 | [Architecture](../ARCHITECTURE.md)        | Current components, storage, and lifecycle                                      |
 | [Application README](../README.md)        | Setup, LAN configuration, and application usage                                 |
 
+## Individual exam review
+
+[Event review and manual exam controls](EVENT-REVIEW.md) describes the current human-review flow, timer policy, API, audit and limitations.
+
 ## Existing feature and verification documents
 
 | Document                                                       | Purpose                                                          |

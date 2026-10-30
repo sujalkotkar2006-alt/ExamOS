@@ -191,9 +191,10 @@ export default function StudentExam() {
   const remaining = x?.deadline_at
     ? Math.max(0, Math.ceil((new Date(x.deadline_at) - now) / 1000))
     : null;
+  const paused = x?.status === "started" && !!x?.paused_at;
   const completed = x?.status === "submitted" || x?.status === "cancelled";
   useEffect(() => {
-    if (x?.status !== "started" || !isOpen || remaining === 0) return;
+    if (x?.status !== "started" || !isOpen || remaining === 0 || paused) return;
     const preventClose = (e) => {
       e.preventDefault();
       e.returnValue = "";
@@ -224,9 +225,9 @@ export default function StudentExam() {
       document.removeEventListener("fullscreenchange", fullscreen);
       window.removeEventListener("keydown", navigation);
     };
-  }, [token, x?.status, x?.focus_consent, isOpen, remaining === 0]);
+  }, [token, x?.status, x?.focus_consent, isOpen, remaining === 0, paused]);
   useEffect(() => {
-    if (x?.status !== "started" || !isOpen || remaining === 0) return;
+    if (x?.status !== "started" || !isOpen || remaining === 0 || paused) return;
     const tick = () => {
       if (sync.current && !sync.current.stopped)
         sync.current.flush(submitting.current).then((done) => {
@@ -239,7 +240,7 @@ export default function StudentExam() {
     };
     const timer = setInterval(tick, 250);
     return () => clearInterval(timer);
-  }, [token, x?.status, isOpen, remaining === 0]);
+  }, [token, x?.status, isOpen, remaining === 0, paused]);
   useEffect(() => {
     if (remaining === 0 || completed) {
       if (sync.current) sync.current.stopped = true;
@@ -248,6 +249,14 @@ export default function StudentExam() {
       setBusy(false);
     }
   }, [remaining === 0, completed]);
+  useEffect(() => {
+    if (paused) {
+      submitting.current = false;
+      setBusy(false);
+      if (sync.current?.pending?.path.endsWith("submit"))
+        sync.current.pending = null;
+    } else if (sync.current) sync.current.next = 0;
+  }, [paused]);
   return (
     <main className="student-exam">
       <header>
@@ -337,18 +346,40 @@ export default function StudentExam() {
                 </button>
               </p>
             )}
+            {paused && (
+              <div className="notice" role="status">
+                <strong>
+                  Your exam has been paused for invigilator review.
+                </strong>
+                <p>Reason: {x.control_reason}</p>
+                <p>
+                  The deadline continues. Your unsent response is retained in
+                  this tab. Editing, saving, submitting and further paper access
+                  are paused. Existing monitoring choices remain under your
+                  control.
+                </p>
+              </div>
+            )}
             {completed ? (
               <div className="notice" role="status">
                 <strong>
-                  {x.status === "submitted"
-                    ? "Examination submitted"
-                    : "Examination closed before you started"}
+                  {x.submission_reason === "teacher_ended"
+                    ? "Your exam has been ended by the invigilator"
+                    : x.status === "submitted"
+                      ? "Examination submitted"
+                      : "Examination closed before you started"}
                 </strong>
                 <p>
                   {x.submitted_at && new Date(x.submitted_at).toLocaleString()}{" "}
                   · {x.submission_reason}
                 </p>
                 <p>Your submission status is recorded. Receipt: {x.id}</p>
+                {x.submission_reason === "teacher_ended" && (
+                  <p>
+                    Reason: {x.control_reason}. Only answers acknowledged by the
+                    server were retained.
+                  </p>
+                )}
               </div>
             ) : !isOpen ? (
               <p className="notice">
@@ -365,9 +396,11 @@ export default function StudentExam() {
                       run(() => api("/exam/start", { focusConsent }))
                     }
                   >
-                    {x?.status === "started"
-                      ? "Examination in progress"
-                      : "Start examination"}
+                    {paused
+                      ? "Examination paused"
+                      : x?.status === "started"
+                        ? "Examination in progress"
+                        : "Start examination"}
                   </button>
                   {x?.status === "started" && (
                     <strong role="timer" aria-label="Time remaining">
@@ -376,13 +409,16 @@ export default function StudentExam() {
                     </strong>
                   )}
                 </div>
-                <PdfViewer
-                  key={pdfEpoch}
-                  url="/api/student/exam/pdf"
-                  token={token}
-                />
+                {!paused && (
+                  <PdfViewer
+                    key={pdfEpoch}
+                    url="/api/student/exam/pdf"
+                    token={token}
+                  />
+                )}
                 <button
                   className="secondary"
+                  disabled={paused}
                   onClick={() => setPdfEpoch((p) => p + 1)}
                 >
                   Reload question paper
@@ -398,7 +434,7 @@ export default function StudentExam() {
                     <label className="response-label">
                       Your text response (optional)
                       <textarea
-                        readOnly={busy || sync.current?.stopped}
+                        readOnly={paused || busy || sync.current?.stopped}
                         value={answers}
                         maxLength={12000}
                         onChange={(e) => {
@@ -439,7 +475,10 @@ export default function StudentExam() {
                     )}
                     <button
                       disabled={
-                        busy || remaining === 0 || sync.current?.stopped
+                        paused ||
+                        busy ||
+                        remaining === 0 ||
+                        sync.current?.stopped
                       }
                     >
                       Submit examination

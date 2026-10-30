@@ -52,6 +52,13 @@ export class AnswerSync {
       if (submitted) this.stopped = true;
       return submitted || !submit;
     } catch (error) {
+      if (error.status === 423) {
+        this.next = now + 1000;
+        this.status(
+          "Examination paused by the invigilator. Unsent text is retained; the deadline continues.",
+        );
+        return false;
+      }
       if (error.status && error.status < 500 && error.status !== 429) {
         this.stopped = true;
         this.status(

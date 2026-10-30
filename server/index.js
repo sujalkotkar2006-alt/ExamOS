@@ -10,7 +10,7 @@ await migrate(db);
 await db.query(
   "UPDATE sessions SET status='ended',ended_at=now() WHERE status='active'",
 );
-const { app, attach } = createApp(db, process.env.JWT_SECRET);
+const { app, attach, drain } = createApp(db, process.env.JWT_SECRET);
 const tls = process.env.TLS_CERT && process.env.TLS_KEY;
 const host = process.env.HOST || "127.0.0.1";
 if (!tls && !["127.0.0.1", "localhost", "::1"].includes(host))
@@ -36,8 +36,9 @@ for (const signal of ["SIGINT", "SIGTERM"])
     await db.query(
       "UPDATE sessions SET status='ended',ended_at=now() WHERE status='active'",
     );
-    io.close();
+    await new Promise(resolve=>io.close(resolve));
     server.close();
+    await drain();
     await closeDatabase(db);
     process.exit(0);
   });

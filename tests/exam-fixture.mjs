@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { mkdir, writeFile } from "node:fs/promises";
+import {testDatabase} from "./test-database.mjs";
 import { randomUUID, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { PGlite } from "@electric-sql/pglite";
@@ -30,12 +30,10 @@ export async function actualPaper() {
     }),
   );
   const bytes = Buffer.from(await doc.save());
-  await mkdir("tests/fixtures", { recursive: true });
-  await writeFile("tests/fixtures/mathematics-question-paper.pdf", bytes);
   return bytes;
 }
 export async function fixture({ pollingOnly = false, persistentDirectory = null } = {}) {
-  let db = new PGlite(persistentDirectory || undefined);
+  let db = await testDatabase({persistentDirectory});
   await migrate(db);
   await migrate(db);
   const teacher = randomUUID(),
@@ -49,7 +47,7 @@ export async function fixture({ pollingOnly = false, persistentDirectory = null 
     "other@local.test",
   ]);
   const secret=randomBytes(48).toString("hex");
-  let { app, attach, online } = createApp(db,secret);
+  let { app, attach, online, drain } = createApp(db,secret);
   let server = http.createServer(app), live = attach(server);
   if (pollingOnly) {
     live.engine.opts.transports = ["polling"];
@@ -92,17 +90,19 @@ export async function fixture({ pollingOnly = false, persistentDirectory = null 
     const port=server.address().port;
     await new Promise(r=>live.close(r));
     server.close();
+    await drain();
     await db.close();
     db=new PGlite(persistentDirectory);
     await migrate(db);
     await db.query("UPDATE sessions SET status='ended',ended_at=now() WHERE status='active'");
-    ({app,attach,online}=createApp(db,secret));
+    ({app,attach,online,drain}=createApp(db,secret));
     server=http.createServer(app); live=attach(server);
     await new Promise(r=>server.listen(port,'127.0.0.1',r));
   };
   const close = async () => {
     await new Promise((r) => live.close(r));
     server.close();
+    await drain();
     await db.close();
   };
   return {

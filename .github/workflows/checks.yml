@@ -1,0 +1,73 @@
+name: Regression checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: python tests/gate_test.py
+      - run: python tests/evidence_gate_test.py
+      - run: node tests/clean-bootstrap.mjs
+        env:
+          EXAMOS_BOOTSTRAP_TEST: isolated-clean-checkout
+      - name: No generated changes to tracked source
+        run: git diff --exit-code
+  postgres-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: examos_test
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: examos_test_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U examos_test -d examos_test_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://examos_test:isolated-ci-only@127.0.0.1:5432/examos_test_ci
+      EXAMOS_TEST_DATABASE_DISPOSABLE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/browser.mjs
+      - run: node tests/vision-dashboard.mjs
+      - run: node tests/exam-browser.mjs
+      - run: node tests/answer-browser.mjs
+      - run: node tests/focused-screen-browser.mjs
+      - run: node tests/exam-controls-browser.mjs
+      - run: node tests/policy-review-browser.mjs
+      - run: git diff --exit-code

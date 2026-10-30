@@ -11,30 +11,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 from event_clip import encode_clip
+from event_gate import EventGate
 
 MODEL_HASH = 'c5c2d13e59ae883e6af3b45daea64af4833a4951c92d116ec270d9ddbe998063'
 
 
-class EventGate:
-    """One incident per continuous condition; two clear seconds and cooldown rearm it."""
-    def __init__(self):
-        self.since, self.last, self.latched, self.absent_since = {}, {}, set(), {}
-
-    def eligible(self, category, present, now, threshold, cooldown):
-        if not present:
-            self.since.pop(category,None)
-            self.absent_since.setdefault(category,now)
-            if now-self.absent_since[category]>=2:
-                self.latched.discard(category)
-            return False
-        self.absent_since.pop(category,None)
-        self.since.setdefault(category,now)
-        return category not in self.latched and now-self.since[category]>=threshold and now-self.last.get(category,-1000000)>=cooldown
-
-    def commit(self, category, now):
-        self.last[category]=now
-        if category!='camera_check':
-            self.latched.add(category)
 
 
 class Detector:
@@ -145,6 +126,7 @@ class CameraMonitor:
             granted = True
             grant = result.get('grantId')
             self.grant=grant
+            self.grant_accepted_at=time.monotonic()
             self.clips_enabled=bool(clips and snapshots and grant)
             clip_seconds = max(4,min(20,int(result.get('clipSeconds',10))))
             cooldown = max(10,min(300,int(result.get('cooldownSeconds',30))))

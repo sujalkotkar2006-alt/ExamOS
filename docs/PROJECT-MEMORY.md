@@ -1,6 +1,6 @@
 # Persistent project memory
 
-Last updated: 30 October 2026.
+Last updated: 31 October 2026.
 
 ## User intent
 
@@ -36,11 +36,19 @@ These are initial working decisions for the roadmap, not additional user-supplie
 
 P0-01 is implemented for REQ-06/REQ-09 and EXT-01: one-second idle / five-second maximum autosave, bounded backoff, request IDs, server response revisions, same-tab draft recovery, conflict stop/review and canonical duplicate submission receipts. Recovery uses sessionStorage keyed by device/attempt, expires at the deadline, and is cleared on completion, authentication loss or fresh launch. It does not survive closing the tab, is not encrypted at rest, and is not a late-submission channel. No staff override was added.
 
-Next implementation task: **P0-02 - monitoring lifecycle and native Windows acceptance**. P0-03 retains clean-environment/CI and native PostgreSQL validation work.
+P0-02 now has single-host native Windows screen lifecycle acceptance and fixes; second-device LAN, packaged lifecycle, optional camera acceptance remain open. The owner confirmed only one Windows computer is available. P0-03 now has fresh Windows locked Node/Python setup and passing Windows/Ubuntu Node 22/24 CI, PostgreSQL 16.15 local and 17 CI API/browser coverage. Keep physical/native sensor acceptance separate from these regression gates. P1-01 now provides focused primary screens, receipt freshness, technical states, keyboard access and filters, with one native device and separate two-device protocol fixtures tested. Next software task after coordinated review is P1-03, then P1-04; do not claim the physical multi-device or Windows/Linux product gates are complete. Delayed heartbeat replies are scoped to request/grant timing: an old negative reply cannot cancel a newer explicit grant, and an expired lease cannot silently renew. Detailed evidence and limits are in PROJECT-STATUS.md.
 
 Handoff assignment: the project owner asked to publish all work so their friend can continue P0-02 onward while the owner works on a separate area. Keep the requirement IDs and acceptance evidence current, and coordinate changes through the shared repository.
 
 Verification detail and limits live in [PROJECT-STATUS.md](PROJECT-STATUS.md); do not duplicate or promote incomplete checks here.
+
+## Current separate workstream
+
+The owner approved observable-event review with manual individual exam pause/resume/end controls. Implementation is isolated on `feature/incident-review-controls`, based on `0178aea`; the friend's P0-02 onward assignment is unchanged. This increment serves REQ-05/06/07/08/09/12 and parts of P1-04/P1-05. See [EVENT-REVIEW.md](EVENT-REVIEW.md).
+
+Decision: pausing holds exam access while the existing deadline continues. It does not grant monitoring consent or lock the operating system. Ending preserves acknowledged answers and requires an explicit human action/reason. The existing authorized teacher role is used; broader administrator/invigilator RBAC remains P1-03. Website/AI-service telemetry remains P1-02. Gaze/attention inference, automatic penalties, compliance certification and OS-level lockdown are not part of this implementation.
+
+The owner subsequently requested a phone/prohibited-app/window-exit end-to-end pass. Started assigned-exam app violations now create proctor incidents; a teacher-requested consented camera snapshot can be linked to an incident using migration 009. Phone snapshots remain automatic only when separately consented; app/window snapshots are later teacher requests, not saved screen frames. Protocol/browser fixture acceptance is distinct from pending physical phone-model validation. See EVENT-REVIEW.md.
 
 ## Update rules
 
@@ -48,3 +56,11 @@ Verification detail and limits live in [PROJECT-STATUS.md](PROJECT-STATUS.md); d
 - Update after a meaningful implementation milestone or user decision; use status/roadmap for detailed results and backlog.
 - Separate observed facts, proposed choices and unresolved questions. The user can revise working decisions without changing the original statement.
 - Do not store credentials, tokens, student information, captured media, private keys or transient machine diagnostics here.
+
+The owner requested bounded implementation batches to conserve usage: finish and verify the current batch, keep reports brief, and avoid deep expansion into later roadmap areas.
+
+Latest follow-up: the receipt-time lease guard passed pure checks and packaged enrollment UI, but two full native lifecycle reruns timed out waiting for consent state. P0-02 is open; investigate this bounded failure before treating the current Windows build as accepted. Earlier successful native runs are historical evidence, not a substitute for current acceptance.
+
+Integration continuation: incident-review/control branch a77e559 is normally merged with monitoring 33c1bb2 on a separate integration branch. Preserve both features and histories. Migrations 008/009 are new and noncolliding. Combined SQL/browser checks passed, including native PostgreSQL; a visibility-aware native lifecycle rerun passed, while physical camera/packaged/LAN gates remain open. Continue bounded P0-02 control/consent checks before new broad architecture work.
+
+Post-merge bounded P0-02 continuation passed real native pause/withdraw/resume/fresh-consent/individual-end and backend restart checks. Visibility restoration is confined to test consent actions; production monitoring rules were not weakened. Keep prior native timing failures and remaining packaged/physical-LAN gates explicit. Integration PR #2 preserves both source branches; main and active maths session remain untouched.

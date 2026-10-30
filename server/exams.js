@@ -1,3 +1,4 @@
+import { installExamControls } from "./exam-controls.js";
 import express from "express";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -286,6 +287,11 @@ export function installExams({
       const x = await attempt(a, req.device.id);
       if (x && ["submitted", "cancelled"].includes(x.status))
         throw problem(409, "Examination already completed");
+      if (x?.paused_at)
+        throw problem(
+          423,
+          "Examination paused by the invigilator. The deadline continues.",
+        );
       await openAttempt(a, req.device.id);
       const p = (
         await db.query("SELECT pdf FROM question_papers WHERE id=$1", [
@@ -355,6 +361,11 @@ export function installExams({
       requireOpen(a);
       const revision = writeVersion(req.body);
       const current = await attempt(a, req.device.id);
+      if (current?.paused_at)
+        throw problem(
+          423,
+          "Examination paused by the invigilator. The deadline continues.",
+        );
       if (
         current?.last_mutation_id === req.body.mutationId &&
         current.answers !== answers(req.body)
@@ -394,6 +405,11 @@ export function installExams({
       const a = await assignment(req),
         x = await attempt(a, req.device.id);
       if (x?.status === "submitted") return res.json(x);
+      if (x?.paused_at)
+        throw problem(
+          423,
+          "Examination paused by the invigilator. The deadline continues.",
+        );
       requireOpen(a);
       const revision = writeVersion(req.body);
       const r = await db.query(
@@ -427,7 +443,7 @@ export function installExams({
   const teacher = express.Router();
   teacher.use((req, res, next) => {
     if (
-      !/^\/(?:papers(?:\/|$)|paper-audit(?:\/|$)|sessions\/[^/]+\/(?:paper|exam-status)(?:\/|$))/.test(
+      !/^\/(?:papers(?:\/|$)|paper-audit(?:\/|$)|sessions\/[^/]+\/(?:paper|exam-status|attempts)(?:\/|$))/.test(
         req.path,
       )
     )
@@ -693,6 +709,14 @@ export function installExams({
       res.json({ ok: true });
     }),
   );
+  installExamControls({
+    teacher,
+    db,
+    route,
+    emit,
+    reconcile,
+    onAttemptFinished,
+  });
   async function progress(teacher, sessionId) {
     await reconcile(teacher);
     const a = (
@@ -704,7 +728,10 @@ export function installExams({
     if (!a) return null;
     const students = (
       await db.query(
-        "SELECT d.id AS device_id,d.name,d.revoked,x.id AS attempt_id,x.status,x.opened_at,x.started_at,x.deadline_at,x.submitted_at,x.submission_reason,x.answers FROM devices d LEFT JOIN exam_attempts x ON x.device_id=d.id AND x.session_id=$1 WHERE d.teacher_id=$2 AND (EXISTS(SELECT 1 FROM session_papers a WHERE a.session_id=$1 AND a.all_devices) OR EXISTS(SELECT 1 FROM paper_assignment_devices z WHERE z.session_id=$1 AND z.device_id=d.id)) ORDER BY d.name",
+        `SELECT d.id AS device_id,d.name,d.revoked,x.id AS attempt_id,x.status,x.paused_at,x.control_reason,x.opened_at,x.started_at,x.deadline_at,x.submitted_at,x.submission_reason,x.answers,
+ (SELECT count(*)::integer FROM proctor_events e WHERE e.attempt_id=x.id AND e.teacher_id=$2 AND e.review_status='pending' AND e.category NOT IN ('camera_check','camera_unavailable','camera_disconnected')) AS pending_incidents,
+ (SELECT count(*)::integer FROM events e WHERE e.session_id=$1 AND e.device_id=d.id AND e.teacher_id=$2 AND e.kind='rule_alert' AND e.review IS NULL) AS pending_app_alerts
+ FROM devices d LEFT JOIN exam_attempts x ON x.device_id=d.id AND x.session_id=$1 WHERE d.teacher_id=$2 AND (EXISTS(SELECT 1 FROM session_papers a WHERE a.session_id=$1 AND a.all_devices) OR EXISTS(SELECT 1 FROM paper_assignment_devices z WHERE z.session_id=$1 AND z.device_id=d.id)) ORDER BY d.name`,
         [sessionId, teacher],
       )
     ).rows.map((x) => ({
@@ -718,7 +745,18 @@ export function installExams({
             )
           : null,
     }));
-    return { assignment: a, students, serverNow: new Date().toISOString() };
+    const controls = (
+      await db.query(
+        "SELECT c.*,t.email AS actor_email FROM exam_controls c JOIN teachers t ON t.id=c.teacher_id WHERE c.teacher_id=$1 AND c.session_id=$2 ORDER BY c.created_at DESC LIMIT 200",
+        [teacher, sessionId],
+      )
+    ).rows;
+    return {
+      assignment: a,
+      students,
+      controls,
+      serverNow: new Date().toISOString(),
+    };
   }
   teacher.get(
     "/sessions/:id/exam-status",

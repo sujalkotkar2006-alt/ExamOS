@@ -1,6 +1,6 @@
 # Product roadmap
 
-Last planned: 30 October 2026. Baseline source: `300a8eb`. P0-01 is implemented with the tab-scoped recovery boundary recorded in PROJECT-STATUS.md; other items remain planned. Track acceptance against [REQUIREMENTS.md](REQUIREMENTS.md), with evidence in [PROJECT-STATUS.md](PROJECT-STATUS.md).
+Last planned: 30 October 2026. Baseline source: `300a8eb`. P0-01 is implemented with the tab-scoped recovery boundary recorded in PROJECT-STATUS.md; P0-02 has single-host native Windows repairs/acceptance and open physical-device/packaged checks; P0-03 regression infrastructure is implemented and verified. P1-01 software is implemented with physical multi-device acceptance still open. Other items remain planned. Track acceptance against [REQUIREMENTS.md](REQUIREMENTS.md), with evidence in [PROJECT-STATUS.md](PROJECT-STATUS.md).
 
 ## Priority decision
 
@@ -47,7 +47,9 @@ Acceptance:
 
 Dependencies: none. Do not redesign the rest of the student page in this task.
 
-### P0-02 — Monitoring lifecycle and native Windows acceptance
+### P0-02 — Monitoring lifecycle and native Windows acceptance (partial)
+
+Current blocker: latest native reruns timed out waiting for consent state after prior successful runs. Keep this item open; see PROJECT-STATUS.md. Work is bounded per the owner’s usage constraint.
 
 Requirements: REQ-01, REQ-03, REQ-06, REQ-09, REQ-10; EXT-02 where existing camera behavior is repaired.
 
@@ -66,9 +68,11 @@ Acceptance:
 
 Dependencies: P0-01 for a complete examination flow. Protocol-only regression checks can run earlier.
 
-### P0-03 — Reproducible development and regression gates
+### P0-03 — Reproducible development and regression gates (implemented)
 
 Requirements: REQ-01, REQ-06, REQ-09, REQ-10, REQ-11.
+
+Observed: fresh Windows Node/Python locked setup, native PostgreSQL 16 and CI PostgreSQL 17 fixtures, pure Python rules, Windows/Ubuntu Node 22/24 CI and browser regressions passed. See PROJECT-STATUS.md for exact builds and limits. This infrastructure does not establish native Linux or physical-LAN acceptance.
 
 Work:
 
@@ -83,7 +87,7 @@ Dependencies: none; retain coverage for P0-01/P0-02 as they land.
 
 ## P1: complete the problem statement
 
-### P1-01 — Focused screen view and classroom triage
+### P1-01 — Focused screen view and classroom triage (software implemented; physical acceptance partial)
 
 Requirements: REQ-02, REQ-04, REQ-09.
 
@@ -129,6 +133,8 @@ Acceptance: actor/target/session/action/time/outcome are attributable; previous 
 Dependencies: P1-03; integrate policy details from P1-02 when available.
 
 ### P1-05 — Acknowledged classroom controls
+
+User-authorized separate increment: individual exam pause/resume/end and atomic control audit are implemented on `feature/incident-review-controls`. The deadline continues during an exam hold; this differs from pausing monitoring. See [EVENT-REVIEW.md](EVENT-REVIEW.md) and PROJECT-STATUS.md for scope and evidence. Full classroom command acknowledgement, announcements, role expansion and managed OS restrictions remain planned.
 
 Requirements: REQ-06, REQ-07, REQ-08, REQ-09, REQ-12.
 
@@ -193,3 +199,9 @@ Dependencies: P0 and required P1 items; P2-01 capacity evidence. Provisioning ma
 | Optional extension release        | Relevant extension acceptance plus regression of the core contract; update scope/status without weakening the initial requirements.                                                                                       |
 
 For every completed backlog item, record the source/build, test environment, checks, results, requirement coverage and remaining limitations. No dates or estimates are commitments until scope, staffing and hardware are known.
+
+## Integrated acceptance increment
+
+Incident review/manual controls (partial P1-04/P1-05) and monitoring/focused screens are combined without completing those roadmap items. Twelve integrated Node tests, native PostgreSQL and browser coverage are recorded in PROJECT-STATUS.md. Priority remains P0-02 native consent/control acceptance; physical/platform release gates remain open.
+
+Post-merge P0-02 continuation: real Windows source pause/withdraw/resume/fresh-consent/teacher-end and process restart checks passed. Packaged/second-device/LAN gates remain open; do not treat the entire item as accepted.

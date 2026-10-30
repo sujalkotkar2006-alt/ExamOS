@@ -10,7 +10,10 @@
     "test:exam-windows": "node tests/exam-windows.mjs",
     "test:proctor-windows": "node tests/proctor-windows.mjs",
     "migrate": "node server/migrate.js",
-    "teacher": "node server/create-teacher.js"
+    "teacher": "node server/create-teacher.js",
+    "test:windows-lifecycle": "node tests/windows-lifecycle.mjs",
+    "test:answer-browser": "node tests/answer-browser.mjs",
+    "test:windows-restart": "node tests/windows-restart.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -34,5 +37,8 @@
     "@playwright/test": "^1.64.1",
     "prettier": "^3.9.10",
     "vite": "^7.2.0"
+  },
+  "engines": {
+    "node": ">=22 <27"
   }
 }

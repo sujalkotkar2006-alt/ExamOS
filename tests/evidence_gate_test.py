@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 import unittest
 sys.path.insert(0,str(Path('agent').resolve()))
-from camera_monitor import EventGate
+from event_gate import EventGate
 
 
 class GateTests(unittest.TestCase):

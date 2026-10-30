@@ -4,7 +4,7 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { io as connect } from "socket.io-client";
-import { PGlite } from "@electric-sql/pglite";
+import {testDatabase} from "./test-database.mjs";
 import { createApp } from "../server/app.js";
 import { migrate, database } from "../server/db.js";
 const secret = "integration-test-secret-at-least-32-characters";
@@ -20,14 +20,10 @@ const socket = (url, auth) =>
     s.on("connect_error", reject);
   });
 test("complete authenticated session lifecycle and isolation", async () => {
-  const db = process.env.TEST_DATABASE_URL
-    ? ((process.env.DATABASE_URL = process.env.TEST_DATABASE_URL),
-      (process.env.EXAMOS_LOCAL_DB = "0"),
-      await database())
-    : new PGlite();
+  const db = await testDatabase();
   await migrate(db);
   await migrate(db);
-  const { app, attach } = createApp(db, secret);
+  const { app, attach, drain } = createApp(db, secret);
   const server = http.createServer(app);
   const live = attach(server);
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -234,6 +230,7 @@ test("complete authenticated session lifecycle and isolation", async () => {
     clients.forEach((s) => s.disconnect());
     await new Promise((r) => live.close(r));
     server.close();
+    await drain();
     if (db.close) await db.close();
     else await db.end();
   }

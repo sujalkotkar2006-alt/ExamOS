@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import "./style.css";
 import QuestionPapers, { ExamProgress } from "./QuestionPapers.jsx";
+import ScreenMonitor from "./ScreenMonitor.jsx";
 import StudentExam from "./StudentExam.jsx";
 import EvidenceCentre from "./EvidenceCentre.jsx";
 import LiveProctoring, { PrivateMedia } from "./LiveProctoring.jsx";
@@ -115,6 +116,7 @@ function App() {
       .then(fn)
       .catch((e) => setError(e.message));
   useEffect(() => {
+    setPreviews({});
     if (!token) return;
     run(refresh);
     const s = io({ auth: { role: "teacher", token } });
@@ -165,7 +167,9 @@ function App() {
           : current,
       ),
     );
-    s.on("preview", (p) => setPreviews((old) => ({ ...old, [p.deviceId]: p })));
+    s.on("disconnect",()=>setPreviews({}));
+    s.on("connect_error",()=>setPreviews({}));
+    s.on("preview", (p) => setPreviews((old) => ({ ...old, [p.deviceId]: {...p,receivedAt:Date.now()} })));
     s.on("clear-previews", () => setPreviews({}));
     s.on("monitoring-stopped", ({ deviceId }) => {
       refreshVersion.current++;
@@ -192,7 +196,7 @@ function App() {
       run(refresh);
       setPreviews((old) =>
         Object.fromEntries(
-          Object.entries(old).filter(([, p]) => Date.now() - p.at < 10000),
+          Object.entries(old).filter(([, p]) => Date.now() - (p.receivedAt ?? p.at) < 10000),
         ),
       );
     }, 5000);
@@ -626,77 +630,24 @@ function App() {
             </h2>
             <span>Screen previews expire after 10 seconds</span>
           </div>
-          <section className="devices">
-            {!state.devices.length && (
-              <div className="empty">
-                No enrolled devices yet. Create an enrollment code to connect
-                the first student.
-              </div>
-            )}
-            {state.devices.map((d) => {
-              const p = previews[d.id];
-              return (
-                <article className="device" key={d.id}>
-                  <div className="device-head">
-                    <strong>{d.name}</strong>
-                    <span className="badge">
-                      {d.revoked
-                        ? "Revoked"
-                        : !d.online
-                          ? "Offline"
-                          : d.consented
-                            ? "Sharing"
-                            : "Awaiting consent"}
-                    </span>
-                  </div>
-                  <div className="screen">
-                    {p && active && p.sessionId === active.id && d.consented ? (
-                      <img
-                        alt={"Consented screen of " + d.name}
-                        src={"data:image/jpeg;base64," + p.jpeg}
-                      />
-                    ) : (
-                      <div>
-                        ▧
-                        <p>
-                          {!d.online
-                            ? "Device disconnected"
-                            : d.consented
-                              ? "Waiting for next preview"
-                              : "No screen shared"}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <footer>
-                    <span>
-                      {d.consented
-                        ? d.app || "Waiting for application"
-                        : "Monitoring stopped"}
-                    </span>
-                    {!d.revoked && (
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          run(() => api("/devices/" + d.id + "/revoke", {}))
-                        }
-                      >
-                        Revoke
-                      </button>
-                    )}
-                  </footer>
-                </article>
-              );
-            })}
-          </section>
+          <ScreenMonitor devices={state.devices} previews={previews} session={active} connected={connected} onRevoke={id=>run(()=>api('/devices/'+id+'/revoke',{}))}/>
+
         </div>
         <div hidden={route.page !== "examinations"}>
+          {selected && (
+            <ExamProgress
+              token={token}
+              sessionId={selected}
+              onReview={(studentId, sessionId) =>
+                navigate("incidents", { studentId, sessionId })
+              }
+            />
+          )}
           <QuestionPapers
             token={token}
             sessions={state.sessions}
             devices={state.devices}
           />
-          {selected && <ExamProgress token={token} sessionId={selected} />}
         </div>
         <div hidden={route.page !== "incidents"}>
           <section className="panel" id="review">
@@ -725,55 +676,64 @@ function App() {
               <div className="empty">No events in this session.</div>
             ) : (
               <div className="event-list">
-                {events.map((e) => (
-                  <article className="event" key={e.id}>
-                    <div>
-                      <span
-                        className={
-                          "badge " + (e.kind === "rule_alert" ? "amber" : "")
-                        }
-                      >
-                        {e.kind.replaceAll("_", " ")}
-                      </span>
-                      <strong>{e.device_name}</strong>
-                      <time>{new Date(e.created_at).toLocaleString()}</time>
-                      <p>
-                        {e.detail.app ||
-                          e.detail.reason ||
-                          "Student consent updated"}
-                      </p>
-                      {e.detail.reason && e.detail.app && (
-                        <p>{e.detail.reason}</p>
-                      )}
-                      {e.review && <blockquote>Review: {e.review}</blockquote>}
-                    </div>
-                    <form
-                      onSubmit={(ev) => {
-                        ev.preventDefault();
-                        const form = ev.target;
-                        run(async () => {
-                          await api("/events/" + e.id + "/review", {
-                            review: new FormData(form).get("review"),
+                {events
+                  .filter(
+                    (e) =>
+                      !new URLSearchParams(route.query).get("studentId") ||
+                      e.device_id ===
+                        new URLSearchParams(route.query).get("studentId"),
+                  )
+                  .map((e) => (
+                    <article className="event" key={e.id}>
+                      <div>
+                        <span
+                          className={
+                            "badge " + (e.kind === "rule_alert" ? "amber" : "")
+                          }
+                        >
+                          {e.kind.replaceAll("_", " ")}
+                        </span>
+                        <strong>{e.device_name}</strong>
+                        <time>{new Date(e.created_at).toLocaleString()}</time>
+                        <p>
+                          {e.detail.app ||
+                            e.detail.reason ||
+                            "Student consent updated"}
+                        </p>
+                        {e.detail.reason && e.detail.app && (
+                          <p>{e.detail.reason}</p>
+                        )}
+                        {e.review && (
+                          <blockquote>Review: {e.review}</blockquote>
+                        )}
+                      </div>
+                      <form
+                        onSubmit={(ev) => {
+                          ev.preventDefault();
+                          const form = ev.target;
+                          run(async () => {
+                            await api("/events/" + e.id + "/review", {
+                              review: new FormData(form).get("review"),
+                            });
+                            await refresh();
                           });
-                          await refresh();
-                        });
-                      }}
-                    >
-                      <label className="sr-only" htmlFor={"review-" + e.id}>
-                        Teacher review
-                      </label>
-                      <input
-                        id={"review-" + e.id}
-                        name="review"
-                        required
-                        maxLength={2000}
-                        placeholder="Add teacher review…"
-                        defaultValue={e.review || ""}
-                      />
-                      <button className="secondary">Save review</button>
-                    </form>
-                  </article>
-                ))}
+                        }}
+                      >
+                        <label className="sr-only" htmlFor={"review-" + e.id}>
+                          Teacher review
+                        </label>
+                        <input
+                          id={"review-" + e.id}
+                          name="review"
+                          required
+                          maxLength={2000}
+                          placeholder="Add teacher review…"
+                          defaultValue={e.review || ""}
+                        />
+                        <button className="secondary">Save review</button>
+                      </form>
+                    </article>
+                  ))}
               </div>
             )}
           </section>
@@ -803,6 +763,11 @@ function App() {
             }
             token={token}
             revision={proctorRevision}
+            reviewQuery={route.query}
+            onOpenControls={(sessionId) => {
+              setSelected(sessionId);
+              navigate("examinations");
+            }}
             selectedIncident={selectedIncident}
             onCloseIncident={() => setSelectedIncident(null)}
             onPendingCount={setPendingCount}

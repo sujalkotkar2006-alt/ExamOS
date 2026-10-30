@@ -12,6 +12,7 @@ export const PROCTOR_CATEGORIES = {
   camera_unavailable: "Camera unavailable",
   camera_disconnected: "Camera disconnected",
   application_switch: "Application switch observed",
+  prohibited_application: "Application outside the examination allowlist",
   window_blur: "Examination window lost focus",
   navigation_attempt: "Examination navigation attempt",
   fullscreen_exit: "Full-screen mode exited",
@@ -120,6 +121,12 @@ export function installProctoring({
     )
       throw issue(400, "Detection confidence must be between zero and one");
     const detail = {};
+    if (
+      p.category === "prohibited_application" &&
+      typeof p.detail?.app === "string" &&
+      p.detail.app.length <= 120
+    )
+      detail.app = p.detail.app;
     for (const k of [
       "personCount",
       "phoneCount",
@@ -134,9 +141,12 @@ export function installProctoring({
         detail.mode = v;
     }
     if (p.clientEventId) {
-      if (!/^[0-9a-f-]{36}$/i.test(p.clientEventId)) throw issue(400,"Invalid client event ID");
-      detail.clientEventId=p.clientEventId;
-      detail.captureSha256=createHash('sha256').update(Buffer.from(p.jpeg || '', 'base64')).digest('hex');
+      if (!/^[0-9a-f-]{36}$/i.test(p.clientEventId))
+        throw issue(400, "Invalid client event ID");
+      detail.clientEventId = p.clientEventId;
+      detail.captureSha256 = createHash("sha256")
+        .update(Buffer.from(p.jpeg || "", "base64"))
+        .digest("hex");
     }
     detail.interpretation =
       "Potential Examination Incident. Observation only. No automatic finding of misconduct.";
@@ -189,13 +199,15 @@ export function installProctoring({
     const observed = new Date(p.observedAt || Date.now());
     if (
       !Number.isFinite(observed.getTime()) ||
-      (observed.getTime()-Date.now()>60000 || Date.now()-observed.getTime()>(p.clientEventId ? 900000 : 60000))
+      observed.getTime() - Date.now() > 60000 ||
+      Date.now() - observed.getTime() > (p.clientEventId ? 900000 : 60000)
     )
       throw issue(
         400,
         "Observation timestamp is outside the permitted clock window",
       );
-    if (observed < new Date(attempt.started_at)) throw issue(400,"Capture predates the examination attempt");
+    if (observed < new Date(attempt.started_at))
+      throw issue(400, "Capture predates the examination attempt");
     const policy = await settings(device.teacher_id),
       days = Math.min(retentionDays, policy.retentionDays),
       id = randomUUID();
@@ -365,16 +377,56 @@ export function installProctoring({
       ack?.({ ok: true });
     });
     on("proctor-event", async (p, ack) => {
-      console.info(JSON.stringify({stage:'upload_received_authenticated',deviceId:d.id,sessionId:p?.sessionId}));
-      if ((p?.deviceId && p.deviceId!==d.id) || (p?.studentId && p.studentId!==d.id)) throw issue(403,'Evidence device identity mismatch');
+      console.info(
+        JSON.stringify({
+          stage: "upload_received_authenticated",
+          deviceId: d.id,
+          sessionId: p?.sessionId,
+        }),
+      );
+      if (
+        (p?.deviceId && p.deviceId !== d.id) ||
+        (p?.studentId && p.studentId !== d.id)
+      )
+        throw issue(403, "Evidence device identity mismatch");
       if (p?.clientEventId) {
-        if (!/^[0-9a-f-]{36}$/i.test(p.clientEventId)) throw issue(400,'Invalid client event ID');
-        const prior=(await db.query("SELECT e.*,a.id AS asset_id FROM proctor_events e LEFT JOIN evidence_assets a ON a.event_id=e.id AND a.kind='snapshot' WHERE e.device_id=$1 AND e.teacher_id=$2 AND e.detail->>'clientEventId'=$3",[d.id,d.teacher_id,p.clientEventId])).rows[0];
-        if(prior) {
-          const hash=createHash('sha256').update(Buffer.from(p.jpeg || '', 'base64')).digest('hex');
-          if(prior.session_id!==p.sessionId || prior.category!==p.category || prior.detail.captureSha256!==hash) throw issue(409,'Client event ID already used for different evidence');
-          if(prior.evidence_deleted_at || (prior.evidence_expires_at && new Date(prior.evidence_expires_at)<=new Date())) throw issue(410,'Evidence expired or deleted');
-          return ack?.({ok:true,id:prior.id,hasEvidence:!!prior.evidence,evidenceId:prior.asset_id,clipExpected:['pending','unavailable','available'].includes(prior.clip_status),duplicate:true});
+        if (!/^[0-9a-f-]{36}$/i.test(p.clientEventId))
+          throw issue(400, "Invalid client event ID");
+        const prior = (
+          await db.query(
+            "SELECT e.*,a.id AS asset_id FROM proctor_events e LEFT JOIN evidence_assets a ON a.event_id=e.id AND a.kind='snapshot' WHERE e.device_id=$1 AND e.teacher_id=$2 AND e.detail->>'clientEventId'=$3",
+            [d.id, d.teacher_id, p.clientEventId],
+          )
+        ).rows[0];
+        if (prior) {
+          const hash = createHash("sha256")
+            .update(Buffer.from(p.jpeg || "", "base64"))
+            .digest("hex");
+          if (
+            prior.session_id !== p.sessionId ||
+            prior.category !== p.category ||
+            prior.detail.captureSha256 !== hash
+          )
+            throw issue(
+              409,
+              "Client event ID already used for different evidence",
+            );
+          if (
+            prior.evidence_deleted_at ||
+            (prior.evidence_expires_at &&
+              new Date(prior.evidence_expires_at) <= new Date())
+          )
+            throw issue(410, "Evidence expired or deleted");
+          return ack?.({
+            ok: true,
+            id: prior.id,
+            hasEvidence: !!prior.evidence,
+            evidenceId: prior.asset_id,
+            clipExpected: ["pending", "unavailable", "available"].includes(
+              prior.clip_status,
+            ),
+            duplicate: true,
+          });
         }
       }
       const s = await active(d.teacher_id);
@@ -414,7 +466,7 @@ export function installProctoring({
             o.clipConsent && (!p.grantId || p.grantId === o.cameraGrant),
         });
       } catch (e) {
-        if (p.requestId && e.status && e.status<500)
+        if (p.requestId && e.status && e.status < 500)
           await db
             .query(
               "UPDATE camera_check_requests SET status='failed',error='Snapshot upload failed or was rejected' WHERE id=$1 AND device_id=$2 AND status='queued'",
@@ -430,7 +482,14 @@ export function installProctoring({
         throw e;
       }
       o.proctorRate = { ...o.proctorRate, [key]: Date.now() };
-      console.info(JSON.stringify({stage:'evidence_validated_stored_catalogued',deviceId:d.id,eventId:result.id,evidenceId:result.evidenceId}));
+      console.info(
+        JSON.stringify({
+          stage: "evidence_validated_stored_catalogued",
+          deviceId: d.id,
+          eventId: result.id,
+          evidenceId: result.evidenceId,
+        }),
+      );
       ack?.({ ok: true, ...result });
     });
     on("exam-environment", async (p, ack) => {
@@ -503,7 +562,12 @@ export function installProctoring({
         )
       ).rows;
       for (const d of devices)
-        d.latestSnapshot = latest.find((a) => a.student_id === d.id&&(!d.session_id||a.session_id===d.session_id)) || null;
+        d.latestSnapshot =
+          latest.find(
+            (a) =>
+              a.student_id === d.id &&
+              (!d.session_id || a.session_id === d.session_id),
+          ) || null;
       res.json({
         events: rows,
         pendingCount: (
@@ -680,11 +744,18 @@ export function installProctoring({
           [req.teacher, row.id],
         )
       ).rows;
+      const relatedEvidence = (
+        await db.query(
+          "SELECT a.id,a.kind,a.captured_at,a.status,a.expires_at FROM camera_check_requests c JOIN evidence_assets a ON a.event_id=c.event_id WHERE c.source_event_id=$1 AND c.teacher_id=$2 AND a.teacher_id=$2 ORDER BY a.captured_at DESC LIMIT 24",
+          [row.id, req.teacher],
+        )
+      ).rows;
       res.json({
         ...row,
         label: PROCTOR_CATEGORIES[row.category],
         reviews,
         timeline,
+        relatedEvidence,
       });
     }),
   );
@@ -764,11 +835,28 @@ export function installProctoring({
           req.body.length > 2097152
         )
           throw issue(400, "A private WebM clip of at most 2 MB is required");
-        console.info(JSON.stringify({stage:'clip_received_authenticated',deviceId:d.id,eventId:req.params.id,bytes:req.body.length}));
-        const stored=(await db.query("SELECT clip,clip_metadata FROM proctor_events WHERE id=$1 AND device_id=$2 AND teacher_id=$3 AND clip IS NOT NULL AND evidence_deleted_at IS NULL AND evidence_expires_at>now()",[req.params.id,d.id,d.teacher_id])).rows[0];
-        if(stored) {
-          if(!Buffer.from(stored.clip).equals(req.body)) throw issue(409,'Different clip already stored for this event');
-          return res.json({ok:true,metadata:stored.clip_metadata,duplicate:true});
+        console.info(
+          JSON.stringify({
+            stage: "clip_received_authenticated",
+            deviceId: d.id,
+            eventId: req.params.id,
+            bytes: req.body.length,
+          }),
+        );
+        const stored = (
+          await db.query(
+            "SELECT clip,clip_metadata FROM proctor_events WHERE id=$1 AND device_id=$2 AND teacher_id=$3 AND clip IS NOT NULL AND evidence_deleted_at IS NULL AND evidence_expires_at>now()",
+            [req.params.id, d.id, d.teacher_id],
+          )
+        ).rows[0];
+        if (stored) {
+          if (!Buffer.from(stored.clip).equals(req.body))
+            throw issue(409, "Different clip already stored for this event");
+          return res.json({
+            ok: true,
+            metadata: stored.clip_metadata,
+            duplicate: true,
+          });
         }
         if (uploads.has(d.id))
           throw issue(429, "A clip upload is already being validated");
@@ -821,7 +909,14 @@ export function installProctoring({
             { id: incident.id, clip_status: "available" },
             "proctor-evidence-ready",
           );
-          console.info(JSON.stringify({stage:'clip_validated_stored_catalogued',deviceId:d.id,eventId:incident.id,bytes:req.body.length}));
+          console.info(
+            JSON.stringify({
+              stage: "clip_validated_stored_catalogued",
+              deviceId: d.id,
+              eventId: incident.id,
+              bytes: req.body.length,
+            }),
+          );
           res.json({ ok: true, metadata });
         });
       } catch (e) {
@@ -900,6 +995,20 @@ export function installProctoring({
           const attempt = await activeAttempt(req.device, a.session_id);
           if (!attempt?.focus_consent)
             throw issue(403, "Examination-window event consent required");
+          const recent = (
+            await db.query(
+              "SELECT id FROM proctor_events WHERE teacher_id=$1 AND device_id=$2 AND session_id=$3 AND attempt_id=$4 AND category=$5 AND received_at>now()-interval '10 seconds' ORDER BY received_at DESC LIMIT 1",
+              [
+                req.device.teacher_id,
+                req.device.id,
+                a.session_id,
+                attempt.id,
+                req.body.category,
+              ],
+            )
+          ).rows[0];
+          if (recent)
+            return res.json({ ok: true, id: recent.id, throttled: true });
           const id = await saveObservation(req.device, a.session_id, req.body);
           res.json({ ok: true, ...id });
         });
@@ -924,6 +1033,14 @@ export function installProctoring({
     );
   }
   return {
+    async recordProhibitedApplication(device, sessionId, appName) {
+      if (!(await activeAttempt(device, sessionId))) return false;
+      await saveObservation(device, sessionId, {
+        category: "prohibited_application",
+        detail: { app: appName },
+      });
+      return true;
+    },
     settings,
     examState,
     activeAttempt,
