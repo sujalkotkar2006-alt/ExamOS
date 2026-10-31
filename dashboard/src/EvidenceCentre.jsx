@@ -131,6 +131,10 @@ export default function EvidenceCentre({
           Refresh evidence
         </button>
       </div>
+      <button className="secondary" onClick={()=>{
+        setStudent('');setSession('');setKind('');setCategory('');setDate('');setSearch('');setStatus('available');setOffset(0);
+        location.hash='/evidence';
+      }}>Clear evidence filters</button>
       <div className="evidence-filters">
         <label>
           Student

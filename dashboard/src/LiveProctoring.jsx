@@ -1,5 +1,12 @@
 import { apiFetch } from "./backend.js";
 import React, { useEffect, useState } from "react";
+function cameraCheckBlockReason(d) {
+  if (!d.online) return 'Reconnect this enrolled device first.';
+  if (!d.examination_id || d.exam_status !== 'started') return 'Start this student’s assigned examination first. Ended or expired exams cannot capture evidence.';
+  if (!d.cameraConsent || d.cameraStatus !== 'active') return 'The student must explicitly start the camera and wait for CAMERA ACTIVE.';
+  if (!d.snapshots) return 'The student must separately allow snapshots before a camera check.';
+  return '';
+}
 export default function LiveProctoring({
   token,
   revision,
@@ -274,7 +281,8 @@ export default function LiveProctoring({
                     <div className="card-actions">
                       <button
                         className="secondary"
-                        disabled={!d.online}
+                        disabled={!!cameraCheckBlockReason(d)}
+                        title={cameraCheckBlockReason(d) || 'Capture a new consented camera snapshot'}
                         onClick={() =>
                           run(async () => {
                             const r = await api(
@@ -300,6 +308,7 @@ export default function LiveProctoring({
                         Open student evidence
                       </button>
                     </div>
+                    {cameraCheckBlockReason(d) && <p className="check-result">Camera check unavailable: {cameraCheckBlockReason(d)}</p>}
                     {d.lastCameraCheck && (
                       <p className="check-result">
                         Camera check: {d.lastCameraCheck.status}
