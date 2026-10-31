@@ -1,0 +1,12 @@
+# Allowlist: never send local credentials, databases, evidence, agents or .git.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!dashboard/
+!dashboard/**
+!server/
+!server/**
+dashboard/dist/
+**/__pycache__/
+**/*.pyc

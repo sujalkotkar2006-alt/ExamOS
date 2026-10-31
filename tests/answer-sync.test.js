@@ -64,6 +64,7 @@ test("SQL response revisions reject stale writes; lost acknowledgements and dupl
     ).data.id;
     await f.request(`/sessions/${session}/paper`, { paperId: paper }, f.token);
     const device = await f.enroll();
+    await f.monitor(device, session);
     await f.request("/student/exam/start", {}, device.token);
     const save = { answers: "one", revision: 0, mutationId: randomUUID() };
     assert.equal(
@@ -125,6 +126,7 @@ test("SQL response revisions reject stale writes; lost acknowledgements and dupl
       1,
     );
     const second = await f.enroll();
+    await f.monitor(second, session);
     await f.request("/student/exam/start", {}, second.token);
     await f.db.query(
       "UPDATE exam_attempts SET deadline_at=now()-interval '1 second' WHERE device_id=$1",

@@ -4,17 +4,19 @@ import https from "node:https";
 import { readFileSync } from "node:fs";
 import { database, migrate, closeDatabase } from "./db.js";
 import { createApp } from "./app.js";
+import { deploymentConfig } from "./deployment.js";
+const deployment = deploymentConfig();
+const tls = process.env.TLS_CERT && process.env.TLS_KEY;
+const host = process.env.HOST || "127.0.0.1";
+if (!tls && !deployment.behindProxy && !["127.0.0.1", "localhost", "::1"].includes(host))
+  throw Error("TLS_CERT and TLS_KEY required for LAN binding; trusted cloud termination requires explicit EXAMOS_BEHIND_PROXY=1");
 const db = await database();
 await migrate(db);
 // Invalidate sessions on restart: agents must receive fresh consent for a new session.
 await db.query(
   "UPDATE sessions SET status='ended',ended_at=now() WHERE status='active'",
 );
-const { app, attach, drain } = createApp(db, process.env.JWT_SECRET);
-const tls = process.env.TLS_CERT && process.env.TLS_KEY;
-const host = process.env.HOST || "127.0.0.1";
-if (!tls && !["127.0.0.1", "localhost", "::1"].includes(host))
-  throw Error("TLS_CERT and TLS_KEY required for LAN binding");
+const { app, attach, drain } = createApp(db, process.env.JWT_SECRET, { deployment });
 const server = tls
   ? https.createServer(
       {

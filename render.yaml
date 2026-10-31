@@ -1,0 +1,24 @@
+# Free public pilot only. Keep a single instance: consent state is in memory.
+services:
+  - type: web
+    name: examos-api
+    runtime: docker
+    plan: free
+    numInstances: 1
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: EXAMOS_BEHIND_PROXY
+        value: "1"
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: PUBLIC_BACKEND_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

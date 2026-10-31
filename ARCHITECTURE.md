@@ -1,5 +1,7 @@
 # ExamOS architecture
 
+First exam start and pre-start paper delivery require connected, session-consented screen monitoring with fresh heartbeat and preview samples, checked against the single server's existing device map. Readiness is exposed to the student page; camera consent is independent. Monitoring loss after start preserves response access and existing manual controls. See [monitored admission](docs/MONITORED-EXAM-START.md) (REQ-06/REQ-09, EXT-01).
+
 Product scope and acceptance are defined in [docs/PROBLEM-STATEMENT.md](docs/PROBLEM-STATEMENT.md) and [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md). This document describes current code. Future roles, Linux adapters, policies, controls and deployment work are planned in [docs/ROADMAP.md](docs/ROADMAP.md), not implemented architecture. Current observed checks are in [docs/PROJECT-STATUS.md](docs/PROJECT-STATUS.md).
 
 This document describes the existing application; no additional service is required.

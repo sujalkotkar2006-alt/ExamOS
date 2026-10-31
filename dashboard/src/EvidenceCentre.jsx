@@ -1,3 +1,4 @@
+import { apiFetch } from "./backend.js";
 import React, { useEffect, useState } from "react";
 import { PrivateMedia } from "./LiveProctoring.jsx";
 const categories = {
@@ -56,7 +57,7 @@ export default function EvidenceCentre({
       p.set("from", start.toISOString());
       p.set("to", end.toISOString());
     }
-    const r = await fetch("/api/proctor/evidence?" + p, {
+    const r = await apiFetch("/api/proctor/evidence?" + p, {
       headers: { Authorization: "Bearer " + token },
       signal,
     });
@@ -95,7 +96,7 @@ export default function EvidenceCentre({
   };
   async function remove() {
     try {
-      const r = await fetch("/api/proctor/evidence/" + deleting.id, {
+      const r = await apiFetch("/api/proctor/evidence/" + deleting.id, {
         method: "DELETE",
         headers: { Authorization: "Bearer " + token },
       });

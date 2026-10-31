@@ -1,3 +1,4 @@
+import { apiFetch } from "./backend.js";
 import React, { useState, useEffect, useRef } from "react";
 import { AnswerSync } from "./answerSync.js";
 import PdfViewer from "./PdfViewer.jsx";
@@ -42,7 +43,7 @@ export default function StudentExam() {
   const offset = useRef(0),
     initialized = useRef(false);
   const api = async (path, body, credential = token) => {
-    const r = await fetch("/api/student" + path, {
+    const r = await apiFetch("/api/student" + path, {
       method: body ? "POST" : "GET",
       signal: AbortSignal.timeout(8000),
       headers: {
@@ -391,7 +392,7 @@ export default function StudentExam() {
               <>
                 <div className="section-head">
                   <button
-                    disabled={busy || x?.status === "started"}
+                    disabled={busy || x?.status === "started" || !data.monitoring?.ready}
                     onClick={() =>
                       run(() => api("/exam/start", { focusConsent }))
                     }
@@ -409,7 +410,14 @@ export default function StudentExam() {
                     </strong>
                   )}
                 </div>
-                {!paused && (
+                {x?.status !== "started" && !data.monitoring?.ready && (
+                  <p className="notice" role="status">
+                    Screen monitoring is required before you can start. In the
+                    desktop agent, choose “I consent — start sharing” and wait
+                    for monitoring to connect. Camera consent is separate.
+                  </p>
+                )}
+                {!paused && (x?.status === "started" || data.monitoring?.ready) && (
                   <PdfViewer
                     key={pdfEpoch}
                     url="/api/student/exam/pdf"

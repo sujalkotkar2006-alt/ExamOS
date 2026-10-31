@@ -1,5 +1,9 @@
 # Requirements and traceability
 
+Cloud pilot preparation (31 October; REQ-03/REQ-06/REQ-08/REQ-09/REQ-11): split-origin/proxy behavior passes local protocol/browser fixtures. Deployment files are prepared; container, hosted TLS, native PostgreSQL, physical-device and availability acceptance are pending. See [CLOUD-PILOT.md](CLOUD-PILOT.md). These requirements remain partial.
+
+31 October supporting acceptance update, REQ-06/REQ-09 and EXT-01: new attempts and pre-start paper access require fresh, session-consented screen telemetry. Server and browser admission checks pass on isolated fixtures; live rollout and physical acceptance remain separate. See [MONITORED-EXAM-START.md](MONITORED-EXAM-START.md).
+
 Baseline: [PROBLEM-STATEMENT.md](PROBLEM-STATEMENT.md). Initial assessment: 30 October 2026, application source commit `300a8eb0ca70a5fe177af754552c137923e673c2`.
 
 The IDs below are the project's interpretation of the supplied statement, not additional hackathon wording. Acceptance criteria make the requirements reviewable. A `Partial` row may contain working code while lacking required functionality or deployment evidence. No row is considered fully accepted solely because the build passes.

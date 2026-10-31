@@ -29,10 +29,12 @@ try {
   ).data.id;
   await f.request(`/sessions/${session}/paper`, { paperId: paper }, f.token);
   const device = await f.enroll("Policy student");
+  await f.monitor(device, session);
   const attempt = (
     await f.request("/student/exam/start", { focusConsent: true }, device.token)
   ).data;
   const withoutWindowConsent = await f.enroll("No window-event consent");
+  await f.monitor(withoutWindowConsent, session);
   await f.request("/student/exam/start", {}, withoutWindowConsent.token);
   assert.equal(
     (

@@ -10,11 +10,29 @@ import { fileURLToPath } from "node:url";
 import { installExams } from "./exams.js";
 import { enrollmentHandlers } from "./enrollment.js";
 import { installProctoring } from "./proctoring.js";
+import { originAllowed } from "./deployment.js";
 export const hash = (s) => createHash("sha256").update(s).digest("hex");
-export function createApp(db, secret) {
+export function createApp(db, secret, { dashboardDirectory = fileURLToPath(new URL("../dashboard/dist", import.meta.url)), deployment = {} } = {}) {
   if (!secret || secret.length < 32)
     throw Error("JWT_SECRET must contain at least 32 characters");
   const app = express();
+  if (deployment.behindProxy) app.set("trust proxy", 1);
+  app.use((req, res, next) => {
+    if (deployment.behindProxy && !req.secure && req.path !== "/api/health")
+      return res.status(400).json({ error: "HTTPS is required" });
+    const origin = req.get("Origin");
+    if (!originAllowed(origin, deployment, `${req.protocol}://${req.get("host")}`))
+      return res.status(403).json({ error: "Browser origin is not allowed" });
+    if (origin) {
+      res.vary("Origin");
+      res.set("Access-Control-Allow-Origin", origin);
+      res.set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Authorization,Content-Type");
+      res.set("Access-Control-Expose-Headers", "Content-Disposition");
+    }
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -116,6 +134,12 @@ export function createApp(db, secret) {
     serialize,
     emit,
     stopMonitoring,
+    monitoringReady: (device, sessionId) => {
+      const o = online.get(device.id);
+      return !!(o && o.teacher === device.teacher_id && o.socket.connected &&
+        o.consented === sessionId && o.screenSampleSession === sessionId &&
+        Date.now() - o.lastSeen <= 8000 && Date.now() - o.lastSample <= 8000);
+    },
     onAttemptFinished: (deviceId, sessionId) => {
       const o = online.get(deviceId);
       if (!o) return;
@@ -167,6 +191,8 @@ export function createApp(db, secret) {
     incidentNotify: (teacher, incident, type = "proctor-incident") =>
       io?.to("teacher:" + teacher).emit(type, incident),
   });
+  // Public liveness only. Keep-alive probes must not consume database compute.
+  app.get("/healthz", (req, res) => res.set("Cache-Control", "no-store").json({ ok: true }));
   app.get(
     "/api/health",
     route(async (req, res) => {
@@ -346,20 +372,19 @@ export function createApp(db, secret) {
     }),
   );
   app.use(
-    express.static(
-      fileURLToPath(new URL("../dashboard/dist", import.meta.url)),
-    ),
+    express.static(dashboardDirectory),
   );
   app.get("/", (req, res) =>
     res.sendFile(
-      fileURLToPath(new URL("../dashboard/dist/index.html", import.meta.url)),
+      path.join(dashboardDirectory, "index.html"),
     ),
   );
-  app.get("/student", (req, res) =>
-    res.sendFile(
-      fileURLToPath(new URL("../dashboard/dist/index.html", import.meta.url)),
-    ),
-  );
+  app.get("/student", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (deployment.appOrigin && deployment.appOrigin !== `${req.protocol}://${req.get("host")}`)
+      return res.redirect(302, deployment.appOrigin + "/student");
+    res.sendFile(path.join(dashboardDirectory, "index.html"));
+  });
   app.use((err, req, res, next) => {
     console.error(err.message);
     res
@@ -428,6 +453,15 @@ export function createApp(db, secret) {
     examTimer.unref();
     server.on("close", () => clearInterval(examTimer));
     io = new Server(server, {
+      cors: {
+        origin: (origin, callback) => callback(null, !origin || [deployment.appOrigin, deployment.backendOrigin].includes(origin)),
+        methods: ["GET", "POST"],
+      },
+      allowRequest: (req, callback) => {
+        const protocol = req.socket.encrypted ? "https" : "http";
+        const secure = protocol === "https" || (deployment.behindProxy && req.headers["x-forwarded-proto"] === "https");
+        callback(null, (!deployment.behindProxy || secure) && originAllowed(req.headers.origin, deployment, `${protocol}://${req.headers.host}`));
+      },
       maxHttpBufferSize: 180000,
       pingTimeout: 6000,
       pingInterval: 4000,
@@ -559,6 +593,8 @@ export function createApp(db, secret) {
             error: "Examination completed; monitoring cannot restart",
           });
         o.consented = p.accept ? s.id : null;
+        o.screenSampleSession = null;
+        o.lastSample = 0;
         if (!p.accept) {
           proctor.clearCamera(o);
           o.lockdownMode = "closed";
@@ -629,6 +665,7 @@ export function createApp(db, secret) {
         )
           return;
         o.lastSample = Date.now();
+        o.screenSampleSession = s.id;
         const changed = o.app !== p.app;
         o.app = p.app;
         const name = p.app.toLowerCase();

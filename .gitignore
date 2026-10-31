@@ -61,5 +61,6 @@ initial-login.txt
 *.pkg
 
 .DS_Store
+.vercel/
 Thumbs.db
 Desktop.ini

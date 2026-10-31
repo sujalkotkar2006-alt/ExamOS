@@ -1,5 +1,13 @@
 # Persistent project memory
 
+## Latest deployment decision: free cloud pilot
+
+The owner requested public hosting, retaining free service tiers and the existing local workflow. Use Satvik-owned Vercel, a single Render Free Docker backend and Neon Free PostgreSQL. Railway's trial was preferred briefly, but new account signups are currently paused. Do not use the connected Srujan Vercel team or enable paid usage. Cloud-origin/proxy handling, a backend Dockerfile and Vercel/Render configuration are prepared; 14 integration tests and a split-origin Chrome flow passed locally. No cloud resources have been created. Next action: sign into Render/Neon/Vercel and configure a separate pilot, then verify hosted behavior before switching devices. Local active exams must not be interrupted. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
+## Latest owner decision: monitored admission
+
+On 31 October 2026 the owner required active screen monitoring before exam start (REQ-06/REQ-09, EXT-01). Implemented first-start/pre-start-paper checks require session-scoped explicit agent consent plus fresh heartbeat and screen samples. Camera permissions remain separate. This admission rule preserves existing attempts and answers during later monitoring loss; no automatic penalties were introduced. All 12 Node tests and four relevant Chrome workflows passed on isolated fixtures. The live service has not been restarted or had its assets replaced. Next deployment action: coordinate rollout after the current examination ends. See [MONITORED-EXAM-START.md](MONITORED-EXAM-START.md).
+
 Last updated: 31 October 2026.
 
 ## User intent

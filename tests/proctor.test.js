@@ -43,6 +43,9 @@ test("consented proctor observations, private evidence, review, retention and al
     const cam = (accept, snapshots = false) =>
       call("camera-consent", { sessionId: sid, accept, snapshots });
     assert.match((await cam(true)).error, /Start/);
+    await call("heartbeat", {});
+    await call("consent", { sessionId: sid, accept: true });
+    await call("sample", { sessionId: sid, app: "exam.exe", jpeg: jpeg.encode({ width: 2, height: 2, data: Buffer.alloc(16, 255) }, 50).data.toString("base64") });
     assert.equal(
       (await r("/student/exam/start", { focusConsent: true }, student)).status,
       200,

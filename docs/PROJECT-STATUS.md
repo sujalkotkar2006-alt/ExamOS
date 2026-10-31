@@ -1,5 +1,15 @@
 # Project status and handoff
 
+## 31 October 2026: cloud deployment preparation
+
+REQ-03/REQ-06/REQ-08/REQ-09/REQ-11: prepared explicit HTTPS proxy/origin configuration, cross-origin frontend API/socket routing, existing-agent exam-link redirection, a Node/Python Docker image definition and Vercel/Render Free deployment files. All 14 Node integration tests and a split-origin Chrome workflow passed locally. Docker build and hosted TLS/PostgreSQL/native-device verification remain pending; no cloud services were created. Railway signups are paused, so the free pilot target is now Vercel + Render + Neon. Local runtime and active examination remain untouched. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
+## 31 October 2026: monitored examination admission
+
+REQ-06/REQ-09 and EXT-01: first start and pre-start PDF access now require fresh, session-consented screen telemetry from the enrolled agent. The student page explains the prerequisite and disables Start until ready. Started attempts retain answer access and their original deadline during monitoring loss; camera permissions remain separate. See [MONITORED-EXAM-START.md](MONITORED-EXAM-START.md).
+
+Observed: 12/12 Node tests on isolated PGlite, separate-output Vite build, and admission, answer-recovery, manual-control and policy-review Chrome workflows passed. These protocol fixtures do not establish physical capture or native PostgreSQL acceptance. The live backend and dashboard assets were left untouched to preserve the current examination; coordinated rollout remains pending.
+
 <<<<<<< HEAD
 Last updated: 31 October 2026. Reviewed application source: `300a8eb0ca70a5fe177af754552c137923e673c2` on `main`. P0-01 is included in handoff `0178aea`. Current continuation is on a feature branch; no shared-main merge or live deployment has been performed.
 =======

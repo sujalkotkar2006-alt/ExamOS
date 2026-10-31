@@ -1,3 +1,4 @@
+import { apiFetch } from "./backend.js";
 import React, { useState, useEffect, useRef } from "react";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -16,7 +17,7 @@ export default function PdfViewer({ url, token, onLoaded }) {
     setError("");
     setReady(false);
     const controller = new AbortController();
-    fetch(url, {
+    apiFetch(url, {
       headers: { Authorization: "Bearer " + token },
       signal: controller.signal,
       cache: "no-store",

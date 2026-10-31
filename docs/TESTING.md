@@ -1,5 +1,7 @@
 # Testing and acceptance evidence
 
+Monitored exam admission (REQ-06/REQ-09, EXT-01) is covered by `tests/exam-monitoring-start.test.js` in `npm test` and by `node tests/exam-monitoring-start-browser.mjs`. See [MONITORED-EXAM-START.md](MONITORED-EXAM-START.md) for isolated-build commands, evidence and hardware limits. Existing exam fixture users must explicitly establish synthetic protocol monitoring with `f.monitor(device, sessionId)` before first start; enrollment alone no longer qualifies.
+
 Use checks that match the changed behavior. [REQUIREMENTS.md](REQUIREMENTS.md) defines acceptance; [ROADMAP.md](ROADMAP.md) defines missing checks; [PROJECT-STATUS.md](PROJECT-STATUS.md) records what was actually observed.
 
 ## Environment

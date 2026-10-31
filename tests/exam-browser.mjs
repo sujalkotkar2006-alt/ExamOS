@@ -68,6 +68,8 @@ try {
     await f.request("/enroll", { name: "Browser enrolled student", code })
   ).data;
   assert.ok(enrolled.token);
+  const activeSession = (await f.request("/state", null, f.token)).data.sessions.find(s => s.status === "active");
+  await f.monitor(enrolled, activeSession.id);
   const launch = (await f.request("/student/launch", {}, enrolled.token)).data;
   studentContext = await browser.newContext({
     viewport: { width: 1100, height: 1000 },

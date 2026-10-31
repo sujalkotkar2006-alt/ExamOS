@@ -1,3 +1,4 @@
+import { apiFetch } from "./backend.js";
 import React, { useRef, useState } from "react";
 
 export default function AttemptControls({
@@ -27,7 +28,7 @@ export default function AttemptControls({
     };
     pending.current = body;
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/sessions/${sessionId}/attempts/${attempt.attempt_id}/control`,
         {
           method: "POST",

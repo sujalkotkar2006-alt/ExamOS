@@ -6,6 +6,8 @@ import { PGlite } from "@electric-sql/pglite";
 import http from "node:http";
 import { migrate } from "../server/db.js";
 import { createApp } from "../server/app.js";
+import { io } from "socket.io-client";
+import jpeg from "jpeg-js";
 export async function actualPaper() {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -32,7 +34,7 @@ export async function actualPaper() {
   const bytes = Buffer.from(await doc.save());
   return bytes;
 }
-export async function fixture({ pollingOnly = false, persistentDirectory = null } = {}) {
+export async function fixture({ pollingOnly = false, persistentDirectory = null, deployment = {} } = {}) {
   let db = await testDatabase({persistentDirectory});
   await migrate(db);
   await migrate(db);
@@ -47,7 +49,8 @@ export async function fixture({ pollingOnly = false, persistentDirectory = null 
     "other@local.test",
   ]);
   const secret=randomBytes(48).toString("hex");
-  let { app, attach, online, drain } = createApp(db,secret);
+  const appOptions = { deployment, ...(process.env.EXAMOS_TEST_DASHBOARD_DIR ? { dashboardDirectory: process.env.EXAMOS_TEST_DASHBOARD_DIR } : {}) };
+  let { app, attach, online, drain } = createApp(db,secret,appOptions);
   let server = http.createServer(app), live = attach(server);
   if (pollingOnly) {
     live.engine.opts.transports = ["polling"];
@@ -60,6 +63,7 @@ export async function fixture({ pollingOnly = false, persistentDirectory = null 
     const r = await fetch(base + "/api" + path, {
       method: method || (body ? "POST" : "GET"),
       headers: {
+        ...(deployment.behindProxy ? { "X-Forwarded-Proto": "https" } : {}),
         ...(token ? { Authorization: "Bearer " + token } : {}),
         ...(!form ? { "Content-Type": "application/json" } : {}),
       },
@@ -85,6 +89,29 @@ export async function fixture({ pollingOnly = false, persistentDirectory = null 
     if (r.status !== 200) return r;
     return request("/student/exchange", { code: r.data.code });
   };
+  const monitors = [];
+  // Synthetic protocol fixture only: no physical display or camera is accessed.
+  const monitor = async (device, sessionId) => {
+    const socket = io(base, { auth: { token: device.token }, transports: pollingOnly ? ["polling"] : ["websocket"], reconnection: false });
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("connect_error", reject);
+    });
+    const call = (name, payload = {}) => socket.timeout(3000).emitWithAck(name, payload);
+    const frame = jpeg.encode({ width: 2, height: 2, data: Buffer.alloc(16, 255) }, 50).data.toString("base64");
+    const sample = () => call("sample", { sessionId, app: "exam.exe", jpeg: frame });
+    await call("heartbeat");
+    const consent = await call("consent", { sessionId, accept: true });
+    if (!consent.ok) throw Error(consent.error || "Test monitoring consent failed");
+    await sample();
+    const timer = setInterval(async () => {
+      try { await call("heartbeat"); await sample(); } catch {}
+    }, 2000);
+    const stop = () => { clearInterval(timer); socket.disconnect(); };
+    socket.once("disconnect", () => clearInterval(timer));
+    monitors.push(stop);
+    return { socket, call, sample, stop, pause: () => clearInterval(timer) };
+  };
   const restart = async () => {
     if(!persistentDirectory) throw Error('Restart requires isolated persistent database');
     const port=server.address().port;
@@ -95,11 +122,12 @@ export async function fixture({ pollingOnly = false, persistentDirectory = null 
     db=new PGlite(persistentDirectory);
     await migrate(db);
     await db.query("UPDATE sessions SET status='ended',ended_at=now() WHERE status='active'");
-    ({app,attach,online,drain}=createApp(db,secret));
+    ({app,attach,online,drain}=createApp(db,secret,appOptions));
     server=http.createServer(app); live=attach(server);
     await new Promise(r=>server.listen(port,'127.0.0.1',r));
   };
   const close = async () => {
+    monitors.forEach(stop => stop());
     await new Promise((r) => live.close(r));
     server.close();
     await drain();
@@ -117,6 +145,7 @@ export async function fixture({ pollingOnly = false, persistentDirectory = null 
     password,
     enroll,
     launch,
+    monitor,
     close,
     online,
     live,

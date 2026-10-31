@@ -44,6 +44,8 @@ test("manual exam controls are scoped, audited, replay-safe and enforced by the 
     await f.request(`/sessions/${session}/paper`, { paperId: paper }, f.token);
     const first = await f.enroll("First student"),
       second = await f.enroll("Second student");
+    await f.monitor(first, session);
+    await f.monitor(second, session);
     const start = (await f.request("/student/exam/start", {}, first.token))
       .data;
     const other = (await f.request("/student/exam/start", {}, second.token))

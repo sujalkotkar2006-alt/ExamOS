@@ -104,6 +104,7 @@ test("real PDF upload, assignment, enrolled-device authorization, exam lifecycle
       "UPDATE session_papers SET opens_at=now()-interval '1 minute',closes_at=now()+interval '5 minutes' WHERE session_id=$1",
       [session],
     );
+    await f.monitor(student, session);
     assert.deepEqual((await r("/student/exam/pdf", null, browser)).data, bytes);
     let progress = (await r("/sessions/" + session + "/exam-status", null, t))
       .data;
@@ -219,6 +220,7 @@ test("server deadlines automatically close sessions and preserve saved responses
     await r("/sessions/" + session + "/paper", { paperId: paper }, t);
     const device = await f.enroll("Late enrolled student");
     const token = (await f.launch(device)).data.token;
+    await f.monitor(device, session);
     await r("/student/exam/start", {}, token);
     await r(
       "/student/exam/save",

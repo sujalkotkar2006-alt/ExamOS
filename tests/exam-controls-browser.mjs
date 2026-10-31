@@ -25,6 +25,8 @@ try {
   await f.request(`/sessions/${session}/paper`, { paperId: paper }, f.token);
   const one = await f.enroll("Review student"),
     two = await f.enroll("Unaffected student");
+  await f.monitor(one, session);
+  await f.monitor(two, session);
   const x = (await f.request("/student/exam/start", {}, one.token)).data;
   await f.request("/student/exam/start", {}, two.token);
   const incident = randomUUID(),

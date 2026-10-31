@@ -1,3 +1,4 @@
+import { apiFetch, BACKEND_ORIGIN } from "./backend.js";
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
@@ -71,7 +72,7 @@ function App() {
   const refreshVersion = useRef(0);
   selection.current = selected;
   const api = async (url, body) => {
-    const r = await fetch("/api" + url, {
+    const r = await apiFetch("/api" + url, {
       method: body ? "POST" : "GET",
       headers: {
         "Content-Type": "application/json",
@@ -119,7 +120,7 @@ function App() {
     setPreviews({});
     if (!token) return;
     run(refresh);
-    const s = io({ auth: { role: "teacher", token } });
+    const s = io(BACKEND_ORIGIN || undefined, { auth: { role: "teacher", token } });
     s.on("connect", () => {
       setConnected(true);
       run(refresh);
@@ -400,7 +401,7 @@ function App() {
                   ? "Expired — generate a new code."
                   : `Expires in ${Math.max(0, Math.ceil((code.until - enrollmentNow) / 1000))} seconds, at ${new Date(code.until).toLocaleTimeString()}. One device only.`}
             </span>
-            <span>Student server URL: {location.origin}</span>
+            <span>Student server URL: {BACKEND_ORIGIN || location.origin}</span>
             <button
               className="secondary"
               disabled={code.used || enrollmentNow >= code.until}

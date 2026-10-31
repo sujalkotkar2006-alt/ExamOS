@@ -22,6 +22,7 @@ export function installExams({
   serialize,
   emit,
   stopMonitoring,
+  monitoringReady = () => false,
   onAttemptFinished = () => {},
 }) {
   async function audit(t, p, s, d, action, detail = {}) {
@@ -275,6 +276,7 @@ export function installExams({
         exam: a,
         attempt: x,
         device: { id: req.device.id, name: req.device.name },
+        monitoring: { ready: monitoringReady(req.device, a.session_id) },
         serverNow: new Date().toISOString(),
       });
     }),
@@ -292,6 +294,8 @@ export function installExams({
           423,
           "Examination paused by the invigilator. The deadline continues.",
         );
+      if (x?.status !== "started" && !monitoringReady(req.device, a.session_id))
+        throw problem(409, "Start screen sharing in the desktop agent and wait for monitoring to connect before opening or starting the examination.");
       await openAttempt(a, req.device.id);
       const p = (
         await db.query("SELECT pdf FROM question_papers WHERE id=$1", [
@@ -306,10 +310,13 @@ export function installExams({
     studentRoute(async (req, res) => {
       const a = await assignment(req);
       requireOpen(a);
-      const x = await openAttempt(a, req.device.id);
-      if (x.status === "started") return res.json(x);
-      if (x.status !== "opened")
+      const x = await attempt(a, req.device.id);
+      if (x?.status === "started") return res.json(x);
+      if (x && x.status !== "opened")
         throw problem(409, "This examination has already been completed");
+      if (!monitoringReady(req.device, a.session_id))
+        throw problem(409, "Start screen sharing in the desktop agent and wait for monitoring to connect before starting the examination.");
+      await openAttempt(a, req.device.id);
       const r = await db.query(
         "UPDATE exam_attempts SET status='started',started_at=now(),deadline_at=LEAST(now()+($3 * interval '1 second'),$4::timestamptz),focus_consent=$5 WHERE session_id=$1 AND device_id=$2 AND status='opened' RETURNING *",
         [

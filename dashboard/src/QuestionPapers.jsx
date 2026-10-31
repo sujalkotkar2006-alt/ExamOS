@@ -1,3 +1,4 @@
+import { apiFetch } from "./backend.js";
 import React, { useState, useEffect } from "react";
 import AttemptControls from "./AttemptControls.jsx";
 import PdfViewer from "./PdfViewer.jsx";
@@ -12,7 +13,7 @@ export function ExamProgress({ token, sessionId, onReview }) {
     let alive = true;
     async function load() {
       try {
-        const r = await fetch("/api/sessions/" + sessionId + "/exam-status", {
+        const r = await apiFetch("/api/sessions/" + sessionId + "/exam-status", {
           headers: { Authorization: "Bearer " + token },
         });
         const x = await r.json();
@@ -185,7 +186,7 @@ export default function QuestionPapers({ token, sessions, devices }) {
     [allDevices, setAllDevices] = useState(true);
   const api = async (path, body) => {
     const form = body instanceof FormData;
-    const r = await fetch("/api" + path, {
+    const r = await apiFetch("/api" + path, {
       method: body ? "POST" : "GET",
       headers: {
         Authorization: "Bearer " + token,

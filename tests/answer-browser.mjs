@@ -21,6 +21,7 @@ try {
   ).data.id;
   await f.request(`/sessions/${session}/paper`, { paperId: paper }, f.token);
   const device = await f.enroll();
+  await f.monitor(device, session);
   const launch = (await f.request("/student/launch", {}, device.token)).data
     .code;
   const page = await browser.newPage();

@@ -1,3 +1,4 @@
+import { apiFetch } from "./backend.js";
 import React, { useEffect, useState } from "react";
 export default function LiveProctoring({
   token,
@@ -27,7 +28,7 @@ export default function LiveProctoring({
     }
   }, [mode]);
   const api = async (path, body) => {
-    const r = await fetch("/api/proctor" + path, {
+    const r = await apiFetch("/api/proctor" + path, {
       method: body ? "POST" : "GET",
       headers: {
         Authorization: "Bearer " + token,
@@ -108,7 +109,7 @@ export default function LiveProctoring({
     }
   };
   async function view(event) {
-    const r = await fetch("/api/proctor/events/" + event.id + "/evidence", {
+    const r = await apiFetch("/api/proctor/events/" + event.id + "/evidence", {
       headers: { Authorization: "Bearer " + token },
     });
     if (!r.ok) throw Error("Evidence unavailable or expired");
@@ -690,7 +691,7 @@ export function PrivateMedia({ token, id, video = false, evidenceId }) {
     const controller = new AbortController();
     setUrl("");
     setError("");
-    fetch(
+    apiFetch(
       evidenceId
         ? "/api/proctor/evidence/" + evidenceId + "/content"
         : "/api/proctor/events/" + id + (video ? "/clip" : "/evidence"),

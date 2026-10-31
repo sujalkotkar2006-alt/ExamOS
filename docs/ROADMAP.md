@@ -1,5 +1,9 @@
 # Product roadmap
 
+Owner-requested cloud pilot: Vercel + Render Free + Neon Free deployment preparation is implemented under REQ-03/REQ-06/REQ-08/REQ-09/REQ-11, with local split-origin acceptance. Hosted/container/native acceptance and backup/restore remain open. See [CLOUD-PILOT.md](CLOUD-PILOT.md). This optional administration path does not close missing Windows/Linux classroom requirements.
+
+31 October owner-requested supporting increment (REQ-06/REQ-09, EXT-01): [monitored exam admission](MONITORED-EXAM-START.md) is implemented and verified in isolated API/browser fixtures; live rollout is pending. This does not complete P0-02 physical monitoring acceptance or the Windows/Linux product gates.
+
 Last planned: 30 October 2026. Baseline source: `300a8eb`. P0-01 is implemented with the tab-scoped recovery boundary recorded in PROJECT-STATUS.md; P0-02 has single-host native Windows repairs/acceptance and open physical-device/packaged checks; P0-03 regression infrastructure is implemented and verified. P1-01 software is implemented with physical multi-device acceptance still open. Other items remain planned. Track acceptance against [REQUIREMENTS.md](REQUIREMENTS.md), with evidence in [PROJECT-STATUS.md](PROJECT-STATUS.md).
 
 ## Priority decision
