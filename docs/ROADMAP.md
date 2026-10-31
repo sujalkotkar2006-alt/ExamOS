@@ -207,3 +207,5 @@ Dependencies: P0 and required P1 items; P2-01 capacity evidence. Provisioning ma
 For every completed backlog item, record the source/build, test environment, checks, results, requirement coverage and remaining limitations. No dates or estimates are commitments until scope, staffing and hardware are known.
 
 31 October package gate: new PE built, but `camera_controls_visible` failed in the packaged UI check on a 768-pixel desktop. The old published EXE was retained; physical second-PC acceptance is still open (REQ-09/REQ-10).
+
+Update: a subsequent layout rebuild passed the packaged UI gate and was published locally. Python 3.13 and second-PC hosted acceptance remain open (REQ-09/REQ-10).

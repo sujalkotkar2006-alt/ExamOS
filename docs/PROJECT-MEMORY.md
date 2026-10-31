@@ -87,3 +87,5 @@ The owner requested bounded implementation batches to conserve usage: finish and
 Latest follow-up: the receipt-time lease guard passed pure checks and packaged enrollment UI, but two full native lifecycle reruns timed out waiting for consent state. P0-02 is open; investigate this bounded failure before treating the current Windows build as accepted. Earlier successful native runs are historical evidence, not a substitute for current acceptance.
 
 Next acceptance for REQ-09/REQ-10: repair the packaged Windows agent's camera controls layout on a 768-pixel display, rebuild and verify with Python 3.13, and run an authorized second-device hosted enrollment/consent/capture test. The 31 October fresh build failed UI visibility and was not published; see [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
+Later in the same handoff, the layout adjustment passed the packaged UI gate and published a new Windows x64 EXE (`a6a0a4928e4664864bf3547296f8321a42363a8f1d6139ad33fb0311402c741b`). Continue with Python 3.13 and second-PC hosted tests; do not treat the first failed build note as current (REQ-09/REQ-10).

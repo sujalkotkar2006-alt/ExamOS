@@ -164,3 +164,5 @@ Keep historical reports attributable to their builds. Never convert a planned ch
 ## 31 October 2026: Windows package build remains open
 
 REQ-09/REQ-10: a fresh Windows x64 PyInstaller build passed PE validation but failed packaged UI visibility (`camera_controls_visible=false`) at 768-pixel display height. The build script did not replace the earlier EXE. Fix the camera controls layout and rebuild using the documented Python 3.13 target, then test the published binary on another managed Windows PC with explicit consent. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
+The subsequent 31 October layout rebuild passed published Windows EXE UI verification on this host, with camera controls visible; see [CLOUD-PILOT.md](CLOUD-PILOT.md). Python 3.13 and second-PC cloud capture acceptance are still open (REQ-09/REQ-10).
