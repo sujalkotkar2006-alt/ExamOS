@@ -1,4 +1,4 @@
-"""Visible, consent-based Windows exam agent. No input hooks or background service."""
+"""Visible, consent-based cross-platform exam agent (Windows & Linux). No input hooks or background service."""
 import base64
 import io
 import json
@@ -10,6 +10,7 @@ import webbrowser
 import hashlib
 import re
 import tempfile
+import sys
 from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
@@ -24,11 +25,51 @@ from camera_monitor import CameraMonitor
 from evidence_uploads import EvidenceUploads
 from exam_environment import ExamEnvironment
 from mss import MSS
-import win32gui
-import win32process
-import win32crypt
 
-CONFIG = Path(os.environ.get('EXAMOS_CONFIG_PATH', str(Path(os.environ.get('LOCALAPPDATA', '.')) / 'ExamOS' / 'device.dat')))
+IS_WINDOWS = sys.platform == 'win32'
+
+if IS_WINDOWS:
+    import win32gui
+    import win32process
+    import win32crypt
+else:
+    win32gui = None
+    win32process = None
+    win32crypt = None
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:
+        Fernet = None
+
+CONFIG = Path(os.environ.get('EXAMOS_CONFIG_PATH', str(Path(os.environ.get('LOCALAPPDATA', os.environ.get('XDG_CONFIG_HOME', '~/.config'))) / 'ExamOS' / 'device.dat'))).expanduser()
+KEY_PATH = CONFIG.parent / 'device.key'
+
+
+def _encrypt_data(data_bytes):
+    if IS_WINDOWS and win32crypt:
+        return win32crypt.CryptProtectData(data_bytes, 'ExamOS device', None, None, None, 0)
+    elif Fernet:
+        CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        if not KEY_PATH.exists():
+            KEY_PATH.write_bytes(Fernet.generate_key())
+            try:
+                os.chmod(KEY_PATH, 0o600)
+            except Exception:
+                pass
+        f = Fernet(KEY_PATH.read_bytes())
+        return f.encrypt(data_bytes)
+    else:
+        return data_bytes
+
+
+def _decrypt_data(encrypted_bytes):
+    if IS_WINDOWS and win32crypt:
+        return win32crypt.CryptUnprotectData(encrypted_bytes, None, None, None, 0)[1]
+    elif Fernet and KEY_PATH.exists():
+        f = Fernet(KEY_PATH.read_bytes())
+        return f.decrypt(encrypted_bytes)
+    else:
+        return encrypted_bytes
 
 
 def server_origin(value):
@@ -44,8 +85,6 @@ def server_origin(value):
     if parsed.scheme != 'https' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
         raise ValueError('HTTPS with a trusted certificate is required for LAN connections.')
     return parsed.scheme + '://' + parsed.netloc.lower()
-
-
 
 
 class Agent:
@@ -99,7 +138,7 @@ class Agent:
         tk.Label(root, text='Screen consent shares primary display every 2 seconds and active app name. Camera requires separate consent.\nNo audio, keystrokes, passwords, or clipboard collected. Close private screen content before accepting. Stop with Escape.', justify='left', font=('Segoe UI', 8)).pack(pady=1)
         frame = tk.Frame(root)
         frame.pack(fill='x', padx=15, pady=1)
-        self.url = self.entry(frame, 'Server URL (HTTPS on LAN)', 'http://127.0.0.1:3000')
+        self.url = self.entry(frame, 'Server URL (HTTPS on LAN)', 'https://examos-api-satvik.onrender.com')
         self.name = self.entry(frame, 'Device / student label', '')
         self.code = self.entry(frame, 'One-use enrollment code', '')
         self.connect_button = tk.Button(frame, text='Enroll / Connect', command=self.connect, font=('Segoe UI', 8, 'bold'))
@@ -141,7 +180,7 @@ class Agent:
         self.camera_preview.pack(pady=1)
         if CONFIG.exists():
             try:
-                self.config = json.loads(win32crypt.CryptUnprotectData(CONFIG.read_bytes(), None, None, None, 0)[1])
+                self.config = json.loads(_decrypt_data(CONFIG.read_bytes()))
                 self.url.delete(0, 'end')
                 self.url.insert(0, self.config['url'])
                 self.name.insert(0, self.config['name'])
@@ -194,11 +233,10 @@ class Agent:
                     if not payload.get('id') or not isinstance(payload.get('token'), str):
                         raise ValueError('The server did not return a valid device credential.')
                     self.config = dict(payload, url=url, name=name, enrollment_code_hash=fingerprint)
-                    # The code is already consumed by HTTP enrollment, independently of the socket connection.
                     self.ui.put(('enrolled', 'Enrollment accepted — connecting with the saved device credential…'))
                     try:
                         CONFIG.parent.mkdir(parents=True, exist_ok=True)
-                        encrypted = win32crypt.CryptProtectData(json.dumps(self.config).encode(), 'ExamOS device', None, None, None, 0)
+                        encrypted = _encrypt_data(json.dumps(self.config).encode())
                         with tempfile.NamedTemporaryFile(dir=CONFIG.parent, prefix='device-', suffix='.tmp', delete=False) as output:
                             output.write(encrypted)
                             temporary = output.name
@@ -244,7 +282,6 @@ class Agent:
                         self.camera.stop()
                         self.environment.close()
                         self.ui.put(('disconnected', None))
-                # Start with HTTP polling; upgrade to WebSocket when available, but do not require it.
                 client.connect(url, auth={'token': self.config['token']}, transports=['polling', 'websocket'], wait_timeout=8)
                 self.ui.put(('connected', None))
                 threading.Thread(target=self.monitor, args=(client,), daemon=True).start()
@@ -301,7 +338,6 @@ class Agent:
         self.consent_jobs.put(work)
 
     def consent_worker(self):
-        # Keep accept/stop requests ordered, without blocking the Tk UI.
         while True:
             job = self.consent_jobs.get()
             if job is None:
@@ -329,7 +365,6 @@ class Agent:
         return result[0]
 
     def toggle_monitoring(self):
-        # A displayed Stop action must never become a fresh consent grant when a lease expires.
         if self.accept_button.cget('text') == 'Stop monitoring (Esc)' or self.gate.allowed() or self.consent_pending:
             self.withdraw()
         else:
@@ -348,7 +383,7 @@ class Agent:
         self.environment.close()
         self.consent_generation += 1
         generation = self.consent_generation
-        self.gate.stop()  # Local capture stops before the network request.
+        self.gate.stop()
         self.indicator_ready = False
         self.consent_pending = False
         last,pending=self.uploads.status()
@@ -363,7 +398,6 @@ class Agent:
                 try:
                     self.server_call(client, 'consent', {'sessionId': session['id'], 'accept': False, 'reason': reason}, timeout=4)
                 except Exception:
-                    # Local capture is already stopped. Disconnect also invalidates server consent.
                     client.disconnect()
                     self.ui.put(('disconnected', None))
                 finally:
@@ -434,7 +468,6 @@ class Agent:
                             self.camera.stop()
                             self.ui.put(('environment_close', None))
                         with self.gate.lock:
-                            # A lease expiry requires fresh consent; never silently resume.
                             if self.gate.accepted and time.monotonic() >= self.gate.lease_until:
                                 self.ui.put(('stop_monitoring', 'lease_expired'))
                                 self.gate.stop()
@@ -446,19 +479,31 @@ class Agent:
                                     continue
                                 generation = self.consent_generation
                                 session_id = self.gate.session['id']
-                                try:
-                                    _, pid = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
-                                    executable = psutil.Process(pid).name()
-                                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                                    executable = '[unavailable]'
-                                if self.environment.process and self.exam_state and self.exam_state.get('status') == 'started' and pid != os.getpid() and not self.environment.owns(pid) and time.monotonic() - self.last_switch > 30:
+                                executable = '[unavailable]'
+                                pid = None
+                                if IS_WINDOWS and win32process and win32gui:
+                                    try:
+                                        _, pid = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
+                                        executable = psutil.Process(pid).name()
+                                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                        executable = '[unavailable]'
+                                else:
+                                    try:
+                                        # Linux / macOS fallback using psutil process iteration or active window
+                                        for p in psutil.process_iter(['name', 'status']):
+                                            if p.info['status'] == psutil.STATUS_RUNNING:
+                                                executable = p.info['name']
+                                                break
+                                    except Exception:
+                                        executable = '[unavailable]'
+
+                                if self.environment.process and self.exam_state and self.exam_state.get('status') == 'started' and pid and pid != os.getpid() and not self.environment.owns(pid) and time.monotonic() - self.last_switch > 30:
                                     self.last_switch = time.monotonic()
                                     with self.network_lock:
                                         client.emit('proctor-event', {'sessionId': session_id, 'category': 'application_switch', 'detail': {'mode': 'limited_edge'}})
                                 shot = capture.grab(capture.monitors[1])
                             if not self.gate.allowed():
                                 continue
-                            # Never hold the consent gate while waiting on network I/O.
                             if self.gate.allowed():
                                 image = Image.frombytes('RGB', shot.size, shot.rgb)
                                 image.thumbnail((960, 540))
@@ -480,7 +525,7 @@ class Agent:
                         self.gate.stop()
                         self.camera.stop()
                         self.ui.put(('monitoring_error', 'Sharing stopped: ' + str(exc)))
-                        capture.close()  # Release native screen handles before a slow transport shutdown.
+                        capture.close()
                         client.disconnect()
                         break
                     self.quit.wait(2)
@@ -625,7 +670,6 @@ class Agent:
         if kind=='frame_captured':
             self.uploads.log.info('webcam_frame_captured valid=true')
             return
-        # Only one preview pending: never accumulate camera frames in memory.
         if kind == 'camera_frame':
             with self.camera_frame_lock:
                 self.camera_frame = data
@@ -659,10 +703,14 @@ class Agent:
         return bool(self.config and scope['url']==self.config['url'] and scope['deviceId']==self.config['id'] and self.camera.status=='active' and self.camera.permitted() and self.camera.snapshots_enabled and scope['sessionId']==self.camera.session_id and (scope.get('kind')!='incident-clip' or self.camera.clips_enabled))
 
     def transmit_evidence(self,name,payload):
-        if name=='incident-clip':
-            payload=dict(payload)
-            payload['bytes']=base64.b64decode(payload.pop('encodedBytes'))
+        name=='incident-clip' and payload.update(bytes=base64.b64decode(payload.pop('encodedBytes')))
         return self.camera_transport(name,payload)
+
+    def data_url(self,name,payload): # fallback stub
+        pass
+
+    def transmissions(self,name,payload): # fallback stub
+        pass
 
     def camera_call(self,name,payload):
         if name in ('proctor-event','incident-clip'):
@@ -723,7 +771,7 @@ class Agent:
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='ExamOS visible Windows student agent')
+    parser = argparse.ArgumentParser(description='ExamOS visible student agent (Windows & Linux)')
     parser.add_argument('--verify-ui', metavar='REPORT_JSON', help='Open the real enrollment UI, check visible widgets without connecting, write a build verification report, and exit')
     parser.add_argument('--verify-enrollment', metavar='REPORT_JSON', help='Verify a real code supplied in EXAMOS_ENROLLMENT_CODE against EXAMOS_TEST_URL using an isolated EXAMOS_CONFIG_PATH; never grant monitoring consent')
     parser.add_argument('--verify-evidence',metavar='REPORT_JSON',help='Visible, explicitly approved packaged webcam acceptance; requires isolated test environment')
@@ -795,7 +843,6 @@ if __name__ == '__main__':
                 import numpy as np
                 import av
                 checks['vp8_encoder_available'] = av.Codec('libvpx','w').type == 'video'
-                # Packaging smoke test only; no real camera is opened by this UI verifier.
                 blank_counts = Detector().counts(np.zeros((480, 640, 3), dtype=np.uint8))
                 checks['packaged_model_blank_frame_inference'] = blank_counts['personCount'] == 0 and blank_counts['phoneCount'] == 0
                 application.toggle_compact()

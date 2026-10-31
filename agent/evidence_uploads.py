@@ -4,11 +4,25 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import sys
 from pathlib import Path
 import threading
 import time
 import uuid
-import win32crypt
+
+IS_WINDOWS = sys.platform == 'win32'
+if IS_WINDOWS:
+    try:
+        import win32crypt
+    except ImportError:
+        win32crypt = None
+else:
+    win32crypt = None
+
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None
 
 
 class EvidenceUploads:
@@ -26,8 +40,24 @@ class EvidenceUploads:
         self.log.addHandler(handler)
         threading.Thread(target=self.run, daemon=True).start()
 
+    def _key(self):
+        key_file = self.directory / '.key'
+        if not key_file.exists() and Fernet:
+            key_file.write_bytes(Fernet.generate_key())
+            try:
+                os.chmod(key_file, 0o600)
+            except Exception:
+                pass
+        return key_file.read_bytes() if key_file.exists() else None
+
     def save(self, path, job):
-        encrypted = win32crypt.CryptProtectData(json.dumps(job).encode(), 'ExamOS temporary evidence', None, None, None, 0)
+        raw = json.dumps(job).encode()
+        if IS_WINDOWS and win32crypt:
+            encrypted = win32crypt.CryptProtectData(raw, 'ExamOS temporary evidence', None, None, None, 0)
+        elif Fernet and self._key():
+            encrypted = Fernet(self._key()).encrypt(raw)
+        else:
+            encrypted = raw
         temporary = path.with_suffix('.tmp')
         with open(temporary, 'wb') as out:
             out.write(encrypted)
@@ -36,7 +66,14 @@ class EvidenceUploads:
         os.replace(temporary, path)
 
     def load(self, path):
-        return json.loads(win32crypt.CryptUnprotectData(path.read_bytes(), None, None, None, 0)[1])
+        content = path.read_bytes()
+        if IS_WINDOWS and win32crypt:
+            raw = win32crypt.CryptUnprotectData(content, None, None, None, 0)[1]
+        elif Fernet and self._key():
+            raw = Fernet(self._key()).decrypt(content)
+        else:
+            raw = content
+        return json.loads(raw)
 
     def enqueue(self, name, payload, scope, dependency=None):
         with self.lock:

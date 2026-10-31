@@ -20,13 +20,25 @@ class ExamEnvironment:
 
     def _open(self, url):
         self.close()
+        browser_bin = None
+        # Windows Edge candidates
         candidates = [Path(os.environ.get(env, '')) / 'Microsoft/Edge/Application/msedge.exe'
                       for env in ('PROGRAMFILES(X86)', 'PROGRAMFILES', 'LOCALAPPDATA')]
-        edge = next((p for p in candidates if p.is_file()), None)
-        if edge is None:
-            raise ValueError('Microsoft Edge is required for the dedicated limited examination window. Use browser mode or install Edge.')
+        for p in candidates:
+            if p.is_file():
+                browser_bin = str(p)
+                break
+        # Linux / cross-platform browser candidates
+        if not browser_bin:
+            for name in ('microsoft-edge', 'google-chrome', 'chromium', 'chromium-browser', 'msedge'):
+                found = shutil.which(name)
+                if found:
+                    browser_bin = found
+                    break
+        if browser_bin is None:
+            raise ValueError('A Chromium-based browser (Edge, Chrome, Chromium) is required for the dedicated examination window. Use browser mode or install Edge/Chrome.')
         self.profile = tempfile.mkdtemp(prefix='examos-exam-')
-        self.process = subprocess.Popen([str(edge), '--user-data-dir=' + self.profile,
+        self.process = subprocess.Popen([browser_bin, '--user-data-dir=' + self.profile,
             '--kiosk', url, '--edge-kiosk-type=fullscreen', '--no-first-run',
             '--kiosk-idle-timeout-minutes=0'])
 
