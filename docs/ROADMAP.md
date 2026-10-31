@@ -1,5 +1,7 @@
 # Product roadmap
 
+31 October hosted milestone: the free Vercel/Render/Neon pilot is live and its approved synthetic exam, manual-control and restart-persistence checks passed (REQ-03/REQ-06/REQ-08/REQ-09/REQ-11, EXT-01). Physical agent/media and capacity/restore work remain open; this is not completion of the institutional Windows/Linux product. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
 Owner-requested cloud pilot: Vercel + Render Free + Neon Free deployment preparation is implemented under REQ-03/REQ-06/REQ-08/REQ-09/REQ-11, with local split-origin acceptance. Hosted/container/native acceptance and backup/restore remain open. See [CLOUD-PILOT.md](CLOUD-PILOT.md). This optional administration path does not close missing Windows/Linux classroom requirements.
 
 31 October owner-requested supporting increment (REQ-06/REQ-09, EXT-01): [monitored exam admission](MONITORED-EXAM-START.md) is implemented and verified in isolated API/browser fixtures; live rollout is pending. This does not complete P0-02 physical monitoring acceptance or the Windows/Linux product gates.
@@ -203,3 +205,5 @@ Dependencies: P0 and required P1 items; P2-01 capacity evidence. Provisioning ma
 | Optional extension release        | Relevant extension acceptance plus regression of the core contract; update scope/status without weakening the initial requirements.                                                                                       |
 
 For every completed backlog item, record the source/build, test environment, checks, results, requirement coverage and remaining limitations. No dates or estimates are commitments until scope, staffing and hardware are known.
+
+31 October package gate: new PE built, but `camera_controls_visible` failed in the packaged UI check on a 768-pixel desktop. The old published EXE was retained; physical second-PC acceptance is still open (REQ-09/REQ-10).

@@ -1,5 +1,22 @@
 # Project status and handoff
 
+## 31 October 2026: public pilot deployed and core hosted flow verified
+
+REQ-03/REQ-06/REQ-08/REQ-09/REQ-11 and EXT-01: Vercel frontend https://examos-satvik.vercel.app and Render backend https://examos-api-satvik.onrender.com are live against the separate Neon database. Teacher login, authenticated API/polling/WebSocket, browser PDF/submission, monitored admission, save/submit replay, pause/resume/end, app flag and dismissal passed on explicitly approved synthetic fixtures. Test sessions ended and device credentials revoked. Render recorded a controlled restart with zero active sessions; saved answer readback/readiness passed afterward. No real sensors or local active exam were touched. The free UptimeRobot monitor (804492379) is configured for public /healthz every five minutes with email alerts; its first external check reported Up (256 ms). Physical agent/media and capacity/restore acceptance remain open. Private login is in ignored data/cloud/initial-login.txt. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
+
+## 31 October 2026: backend deployed; frontend authentication pending
+
+REQ-03/REQ-06/REQ-08/REQ-09/REQ-11: Render Free Docker build/start succeeded in Singapore at `https://examos-api-satvik.onrender.com` on deployment branch `36f0122`. All 10 migrations are present in Neon (19 public tables); public health/readiness, unauthorized API rejection, private-path rejection and student redirect passed. Vercel project `examos-satvik` is created in the owner's `7week` workspace; static upload is awaiting email reauthentication. Explicit owner approval is pending for cloud teacher provisioning after automatic review rejected that access change. No authenticated hosted acceptance or persistence-after-restart claim is made. Local service was not restarted. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
+## 31 October 2026: resumed cloud connection check
+
+REQ-03/REQ-06/REQ-08/REQ-09/REQ-11: verified the existing Neon project's PostgreSQL 18.6 connection through an authorized client TLS 1.3 socket using read-only SQL. No public application tables exist yet. The direct connection string and verification report remain in ignored `data/cloud`; no secrets were printed and the live `.env` was not replaced. Local health returned OK with no restart. Cloud migrations, teacher provisioning, Render/Vercel creation and hosted end-to-end checks remain pending. Browser form completion is blocked by disabled local browser use in Work settings; the owner has been asked to enable it. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
+## 31 October 2026: Neon resource and project tooling
+
+REQ-06/REQ-08/REQ-09/REQ-11: created the owner's Singapore ExamOS PostgreSQL project, installed two project Neon skills and an OAuth-only MCP connection limited to 10 read-only docs/schema/querying tools. Codex recognizes the configuration and OAuth authentication succeeded via DCR. Existing local `.env` and global Codex configuration are hash-verified unchanged. The current chat has not reloaded the new MCP tools, and the application schema/cloud deployment has not been verified. See [NEON-SETUP.md](NEON-SETUP.md).
+
 ## 31 October 2026: cloud deployment preparation
 
 REQ-03/REQ-06/REQ-08/REQ-09/REQ-11: prepared explicit HTTPS proxy/origin configuration, cross-origin frontend API/socket routing, existing-agent exam-link redirection, a Node/Python Docker image definition and Vercel/Render Free deployment files. All 14 Node integration tests and a split-origin Chrome workflow passed locally. Docker build and hosted TLS/PostgreSQL/native-device verification remain pending; no cloud services were created. Railway signups are paused, so the free pilot target is now Vercel + Render + Neon. Local runtime and active examination remain untouched. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
@@ -10,11 +27,7 @@ REQ-06/REQ-09 and EXT-01: first start and pre-start PDF access now require fresh
 
 Observed: 12/12 Node tests on isolated PGlite, separate-output Vite build, and admission, answer-recovery, manual-control and policy-review Chrome workflows passed. These protocol fixtures do not establish physical capture or native PostgreSQL acceptance. The live backend and dashboard assets were left untouched to preserve the current examination; coordinated rollout remains pending.
 
-<<<<<<< HEAD
-Last updated: 31 October 2026. Reviewed application source: `300a8eb0ca70a5fe177af754552c137923e673c2` on `main`. P0-01 is included in handoff `0178aea`. Current continuation is on a feature branch; no shared-main merge or live deployment has been performed.
-=======
-Last updated: 31 October 2026. Reviewed application source: `300a8eb0ca70a5fe177af754552c137923e673c2` on `main`. P0-01 has subsequently been implemented in the working tree; no release or live deployment has been performed.
->>>>>>> origin/feature/incident-review-controls
+Historical baseline: initial review used `300a8eb` on `main`; P0-01 is included in handoff `0178aea`. The current cloud pilot is deployed from `codex/cloud-pilot` commit `36f0122`. Shared `main` was not modified by this deployment. The newest dated entry above takes precedence over the historical checkpoints below.
 
 ## Current product state
 
@@ -147,3 +160,7 @@ Next action:
 ```
 
 Keep historical reports attributable to their builds. Never convert a planned check into a passed result.
+
+## 31 October 2026: Windows package build remains open
+
+REQ-09/REQ-10: a fresh Windows x64 PyInstaller build passed PE validation but failed packaged UI visibility (`camera_controls_visible=false`) at 768-pixel display height. The build script did not replace the earlier EXE. Fix the camera controls layout and rebuild using the documented Python 3.13 target, then test the published binary on another managed Windows PC with explicit consent. See [CLOUD-PILOT.md](CLOUD-PILOT.md).

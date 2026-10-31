@@ -1,5 +1,7 @@
 # Requirements and traceability
 
+Hosted pilot update, 31 October (REQ-03/REQ-06/REQ-08/REQ-09/REQ-11, EXT-01): Vercel/Render/Neon are deployed; authenticated public browser/API/polling/WebSocket, synthetic monitored exam/control/response workflows, and controlled-restart answer persistence passed. These requirements remain partial pending physical devices/media, capacity and restore acceptance. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
+
 Cloud pilot preparation (31 October; REQ-03/REQ-06/REQ-08/REQ-09/REQ-11): split-origin/proxy behavior passes local protocol/browser fixtures. Deployment files are prepared; container, hosted TLS, native PostgreSQL, physical-device and availability acceptance are pending. See [CLOUD-PILOT.md](CLOUD-PILOT.md). These requirements remain partial.
 
 31 October supporting acceptance update, REQ-06/REQ-09 and EXT-01: new attempts and pre-start paper access require fresh, session-consented screen telemetry. Server and browser admission checks pass on isolated fixtures; live rollout and physical acceptance remain separate. See [MONITORED-EXAM-START.md](MONITORED-EXAM-START.md).

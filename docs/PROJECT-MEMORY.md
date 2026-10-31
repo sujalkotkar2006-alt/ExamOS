@@ -1,6 +1,23 @@
 # Persistent project memory
 
-## Latest deployment decision: free cloud pilot
+## Current public pilot URLs and handoff
+
+The free pilot is live: frontend https://examos-satvik.vercel.app, agent/backend origin https://examos-api-satvik.onrender.com, existing Neon Singapore project wild-lake-66325838. Owner explicitly approved cloud teacher creation and synthetic persistent exam/control tests. Generated login stays in ignored data/cloud/initial-login.txt. Hosted login/API/polling/WebSocket, monitored admission, browser PDF and saved submission/receipt, app flag/dismissal and manual pause/resume/end passed; controlled restart preserved stored answers. All synthetic sessions ended and test-device credentials revoked. Vercel is a five-file static upload in Satvik's 7week Hobby project; no unrelated GitHub integration was used. Render auto-deploy remains off on codex/cloud-pilot commit 36f0122. Do not use local enrollment credentials against cloud; enroll real devices afresh with visible consent. UptimeRobot monitor 804492379 checks public /healthz every five minutes with email alerts; the first external check reported Up (256 ms). Physical agent/media and capacity/restore remain next acceptance steps. Local service remains separate. See CLOUD-PILOT.md.
+
+
+## Historical checkpoint: backend deployed, frontend pending
+
+Browser access recovered. Render Free service `srv-dbijtivlk1mc73eu5kl0`, Singapore, is live at `https://examos-api-satvik.onrender.com` on `36f0122`, auto-deploy off. Neon migrations 001–010 and unauthenticated hosted checks pass; teacher table is empty. Vercel project `examos-satvik` / `prj_MLGlTLhPvzeocuPEb6d3jQCECtsX` in Satvik's Hobby workspace `7week` is created without the unrelated GitHub integration. Five static frontend files are staged for production upload; Vercel requires the email code sent to the owner before publication. Owner was asked to enter it in the browser. Automatic review rejected cloud teacher creation; a specific approval question is pending. Finish these pending steps, then hosted authenticated/browser/native checks and controlled restart persistence. No active local server interruption occurred. Private Render vars are in ignored `data/cloud/render.env`; never print them. See CLOUD-PILOT.md.
+
+## Historical checkpoint: browser access blocked
+
+Resumed the cloud handoff on 31 October: existing Neon project connection verified read-only with authorized TLS 1.3, PostgreSQL 18.6, and no public application tables. Direct credentials and the verification report are under ignored `data/cloud`; preserve them and do not print them. Local health is OK and was not restarted. Cloud setup remains unfinished because browser use is disabled in the current account's Work settings. Next action: owner enables browser use; then inspect and finish the existing Render/Vercel forms without duplicate resources. Preserve the read-only MCP permissions and all existing uncommitted Neon tooling/docs.
+
+## Historical checkpoint: Neon setup; preserve local environment
+
+The owner explicitly requested the official Neon skill and missing project MCP/skills setup. Installed `neon` and `neon-postgres` in `.agents/skills`, added project-only OAuth MCP configuration, linked ExamOS project `wild-lake-66325838` / production in Satvik organization `org-aged-shape-11934542` (Singapore). MCP is read-only, scoped to this project and docs/schema/querying; OAuth login succeeded using DCR after the default registration failed. Initial broad read/write authorization was rejected and cancelled. Existing global Codex configuration and local `.env` hashes are unchanged. Use `--no-env-pull` for Neon link/checkout and a separate ignored file for cloud credentials. CLI 8.15.0 and its profile are under ignored `data/`; the application dependencies were unchanged. See [NEON-SETUP.md](NEON-SETUP.md). Cloud application deployment is still pending; do not claim the pilot is live.
+
+## Historical checkpoint: free cloud pilot decision
 
 The owner requested public hosting, retaining free service tiers and the existing local workflow. Use Satvik-owned Vercel, a single Render Free Docker backend and Neon Free PostgreSQL. Railway's trial was preferred briefly, but new account signups are currently paused. Do not use the connected Srujan Vercel team or enable paid usage. Cloud-origin/proxy handling, a backend Dockerfile and Vercel/Render configuration are prepared; 14 integration tests and a split-origin Chrome flow passed locally. No cloud resources have been created. Next action: sign into Render/Neon/Vercel and configure a separate pilot, then verify hosted behavior before switching devices. Local active exams must not be interrupted. See [CLOUD-PILOT.md](CLOUD-PILOT.md).
 
@@ -68,3 +85,5 @@ The owner subsequently requested a phone/prohibited-app/window-exit end-to-end p
 The owner requested bounded implementation batches to conserve usage: finish and verify the current batch, keep reports brief, and avoid deep expansion into later roadmap areas.
 
 Latest follow-up: the receipt-time lease guard passed pure checks and packaged enrollment UI, but two full native lifecycle reruns timed out waiting for consent state. P0-02 is open; investigate this bounded failure before treating the current Windows build as accepted. Earlier successful native runs are historical evidence, not a substitute for current acceptance.
+
+Next acceptance for REQ-09/REQ-10: repair the packaged Windows agent's camera controls layout on a 768-pixel display, rebuild and verify with Python 3.13, and run an authorized second-device hosted enrollment/consent/capture test. The 31 October fresh build failed UI visibility and was not published; see [CLOUD-PILOT.md](CLOUD-PILOT.md).
